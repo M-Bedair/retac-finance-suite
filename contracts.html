@@ -1,0 +1,2270 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<!-- Standalone Web migration layer -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js"></script>
+<script src="js/supabase-adapter.js"></script>
+
+  
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RETAC Contract Management System</title>
+  <style>
+  :root{
+    --navy-dark:#EEF5FC;   /* page background — soft light blue */
+    --navy:#FFFFFF;        /* card / surface background */
+    --navy-light:#E9F2FB;  /* secondary surface — inputs, hover states, chips */
+    --gold:#2660A8;        /* primary accent — blue */
+    --gold-soft:#1E4E88;   /* accent hover/darker blue */
+    --white:#173765;       /* high-emphasis text (headings) — deep navy ink */
+    --text:#2C4A6E;        /* base body text */
+    --secondary:#6680A5;   /* muted / secondary text */
+    --success:#2E9B5D;
+    --warning:#B9821F;
+    --danger:#D14F4F;
+    --line: rgba(23,55,101,0.09);
+    --teal-1:#1E4E88;      /* deep wave blue */
+    --teal-2:#3977BD;      /* mid wave blue */
+    --teal-3:#AACBEA;      /* light wave blue */
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:'Segoe UI', Tahoma, Arial, sans-serif;
+    background:var(--navy-dark);
+    color:var(--text);
+    min-height:100vh;
+  }
+  html[dir="rtl"] body{ font-family:'Segoe UI', Tahoma, 'Cairo', Arial, sans-serif; }
+  .hidden{display:none !important;}
+  button{font-family:inherit; cursor:pointer;}
+  input, textarea, select{font-family:inherit;}
+
+  /* global language toggle — fixed, always on top of loader/login/app */
+  .lang-toggle-fixed{
+    position:fixed; top:16px; inset-inline-end:16px; z-index:250;
+    display:flex; align-items:center; gap:7px;
+    background:var(--navy); border:1px solid var(--line); border-radius:100px;
+    padding:9px 16px; color:var(--text); font-size:12.5px; font-weight:700;
+    box-shadow:0 6px 18px rgba(15,23,42,0.08);
+  }
+  .lang-toggle-fixed:hover{border-color:var(--gold); color:var(--gold);}
+  .lang-toggle-fixed .lang-icon{font-size:14px;}
+
+  /* loader */
+  .app-loader{
+    position:fixed; inset:0; background:var(--navy-dark); display:flex; flex-direction:column;
+    align-items:center; justify-content:center; z-index:200; gap:14px;
+  }
+  .loader-logo{font-size:34px; font-weight:800; letter-spacing:6px; color:var(--gold);}
+  .loader-line{width:80px; height:2px; background:linear-gradient(90deg, transparent, var(--gold), transparent); animation:pulse 1.3s ease-in-out infinite;}
+  @keyframes pulse{0%,100%{opacity:.3;}50%{opacity:1;}}
+  .loader-text{font-size:12.5px; color:var(--secondary); letter-spacing:1px;}
+
+  /* spinner shown under the RETAC wordmark while data loads */
+  .loader-spinner{
+    width:34px; height:34px; border-radius:50%;
+    border:3px solid rgba(38,96,168,0.15); border-top-color:var(--gold);
+    animation:spin 0.9s linear infinite;
+  }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+
+  /* animated "..." after the loader message so it never looks frozen */
+  .loader-dots::after{
+    content:'';
+    animation:dots 1.4s steps(4,end) infinite;
+  }
+  @keyframes dots{
+    0%{content:'';} 25%{content:'.';} 50%{content:'..';} 75%{content:'...';} 100%{content:'';}
+  }
+
+  /* =====================================================================
+     RETAC login screen — single clean set of rules (blue theme).
+     Desktop centering uses flexbox instead of fixed/absolute hacks so it
+     scales correctly at any width without extra "final override" blocks.
+     ===================================================================== */
+  .login-screen{
+    position:fixed; inset:0; z-index:180; overflow:hidden;
+    display:block; background:#EAF6FD; color:#102C59;
+  }
+  .login-bg{position:absolute; inset:0; width:100%; height:100%; z-index:0; pointer-events:none;}
+  .login-bg path{stroke:none}
+  .bg-top{fill:#EAF6FD}
+  .bg-main{fill:#F7FBFE}
+  .bg-wave-1{fill:#D9F0FB}
+  .bg-wave-2{fill:#C7E8F8}
+
+  .login-page{
+    position:relative; z-index:1; width:100%; min-height:100vh;
+    display:grid; grid-template-columns:53% 47%;
+  }
+
+  /* ---- left / brand side ---- */
+  .login-left{
+    position:relative; min-width:0; overflow:hidden;
+    padding:38px 3vw 45px 8vw;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+  }
+  .login-logo-top{
+    position:absolute; top:0; left:0; inset-inline-start:0; height:auto;
+    display:flex; align-items:flex-start; justify-content:flex-start;
+    z-index:10;
+  }
+  .login-logo-top img{width:240px; height:auto; max-height:120px; object-fit:contain; object-position:left top; display:block;}
+
+  .login-brand-copy{max-width:520px; width:100%; text-align:center;}
+  .welcome-text{font-size:45px; line-height:1.2; font-weight:400; letter-spacing:-1px; color:#1D3A53;}
+  .retac-word{font-size:75px; line-height:1.2; font-weight:400; letter-spacing:-2px; color:#255897;}
+  .retac-rule{width:200px; height:5px; border-radius:999px; background:#2B6BB4; margin:22px auto 40px;}
+  .retac-description{font-size:21px; line-height:1.4; color:#1D3A53;}
+
+  /* optional benefit chips (not currently used in markup, kept themed for reuse) */
+  .login-benefits{width:min(720px,100%); margin:35px auto 0; display:flex; align-items:center; gap:27px; justify-content:center;}
+  .login-benefits>i{width:1px; height:58px; flex:0 0 1px; background:rgba(36,91,158,.28);}
+  .benefit{display:flex; align-items:center; gap:12px; min-width:0;}
+  .benefit-icon{width:61px; height:61px; flex:0 0 61px; border-radius:50%; display:flex; align-items:center; justify-content:center; color:#2B6BB4; background:rgba(255,255,255,.72); box-shadow:0 8px 22px rgba(36,84,145,.08), inset 0 0 0 1px rgba(36,84,145,.06);}
+  .benefit-icon svg{width:32px; height:32px;}
+  .benefit strong{display:block; font-size:15px; line-height:1.2; font-weight:800; color:#173765; margin-bottom:5px;}
+  .benefit span{display:block; font-size:12.5px; line-height:1.35; color:#2C4A6E;}
+
+  /* ---- right / form side ---- */
+  .login-right{position:relative; min-width:0; display:flex; align-items:center; justify-content:center; padding:45px 6vw;}
+  .login-card{
+    width:100%; max-width:400px; box-sizing:border-box;
+    padding:38px 34px 24px; border-radius:22px;
+    background:rgba(255,255,255,.97); border:1px solid rgba(200,217,236,.95);
+    box-shadow:0 24px 55px rgba(36,84,145,.15);
+    display:flex; flex-direction:column;
+  }
+  .login-title{font-size:32px; line-height:1.15; font-weight:800; letter-spacing:-1px; color:#173765; text-align:center; margin:0 0 7px;}
+  .login-sub{font-size:15px; line-height:1.4; color:#6680A5; text-align:center; margin:0 0 30px;}
+  .login-error{background:rgba(209,79,79,.08); border:1px solid rgba(209,79,79,.28); color:#C84444; font-size:13px; padding:10px 12px; border-radius:9px; margin-bottom:16px; text-align:center;}
+  .login-field{margin-bottom:22px;}
+  .login-screen .field-icon label{display:block; font-size:14.5px; line-height:1.2; font-weight:600; color:#173765; margin:0 0 9px;}
+  .login-screen .input-with-icon{position:relative; display:flex; align-items:center;}
+  .login-screen .input-with-icon .input-icon{position:absolute; inset-inline-start:18px; color:#315C91; display:flex; pointer-events:none;}
+  .login-screen .input-with-icon input{
+    width:100%; height:56px; box-sizing:border-box; background:#fff; border:1.7px solid #C3D9EE;
+    border-radius:9px; padding:0 48px; color:#102C59; font-size:14.5px; outline:none; transition:border-color .16s,box-shadow .16s;
+  }
+  .login-screen .input-with-icon input::placeholder{color:#7890B1; opacity:1;}
+  .login-screen .input-with-icon input:focus{border-color:#68A5E2; box-shadow:0 0 0 3px rgba(73,139,204,.10);}
+  .login-screen .input-icon-end{position:absolute; inset-inline-end:16px; background:transparent; border:none; color:#315C91; display:flex; align-items:center; justify-content:center; padding:3px; cursor:pointer;}
+  .login-screen .input-icon-end:hover,.login-screen .input-icon-end.active{color:#1E4E88;}
+  .login-screen .login-row{display:flex; align-items:center; justify-content:space-between; margin:-2px 0 24px; flex-wrap:wrap; gap:10px;}
+  .login-screen .remember-me{display:flex; align-items:center; gap:9px; font-size:13.5px; color:#203A52; cursor:pointer;}
+  .login-screen .remember-me input{width:19px; height:19px; margin:0; appearance:none; -webkit-appearance:none; border:2px solid #AEC4D0; border-radius:5px; background:#fff; cursor:pointer;}
+  .login-screen .remember-me input:checked{background:#2C65A4; border-color:#2C65A4; box-shadow:inset 0 0 0 4px #fff;}
+  .login-screen .forgot-link{font-size:13.5px; color:#0C55B3; text-decoration:none; font-weight:600;}
+  .login-screen .forgot-link:hover{text-decoration:underline;}
+  .login-screen .btn-login{
+    width:100%; min-height:56px; display:flex; align-items:center; justify-content:center; gap:14px;
+    background:linear-gradient(100deg,#2E5E9B,#28578F); color:#fff; font-size:18px; font-weight:700;
+    padding:11px 20px; border:none; border-radius:9px; transition:.15s; box-shadow:0 8px 18px rgba(36,84,145,.16);
+  }
+  .login-screen .btn-login:hover{filter:brightness(1.05); transform:translateY(-1px);}
+  .login-screen .btn-login:disabled{opacity:.6; transform:none;}
+  .login-screen .login-divider{display:flex; align-items:center; width:100%; margin:24px 0 18px; color:#6680A5; font-size:13.5px;}
+  .login-screen .login-divider::before,.login-screen .login-divider::after{content:""; flex:1; height:1px; background:#D4DFEC;}
+  .login-screen .login-divider span{padding:0 20px; white-space:nowrap;}
+  .google-login-btn{width:100%; height:56px; border:1.6px solid #BFD2E7; border-radius:9px; background:#fff; color:#173765; display:flex; align-items:center; justify-content:center; gap:20px; font-size:16px; font-weight:700; cursor:pointer; transition:.15s;}
+  .google-login-btn:hover{border-color:#A9C3DD; background:#FBFDFE;}
+  .google-g{display:flex; align-items:center; justify-content:center;}
+  .login-footer-note{margin-top:auto; padding-top:30px; font-size:12.5px; color:#49688F; text-align:center;}
+  .login-footer-note .gold-text{color:#0C55B3; font-weight:600;}
+
+  @media (max-width:1150px){
+    .retac-word{font-size:82px;}
+    .retac-description{font-size:20px;}
+    .login-card{max-width:380px; padding:36px 30px 24px;}
+  }
+  @media (max-width:980px){
+    .login-page{grid-template-columns:1fr;}
+    .login-left{min-height:420px; padding:70px 6vw 40px; align-items:center; justify-content:flex-start;}
+    .login-logo-top{position:absolute; top:0; left:0; inset-inline-start:0; margin:0; width:auto; justify-content:flex-start;}
+    .login-brand-copy{text-align:center; max-width:600px;}
+    .login-right{padding:20px 6vw 50px;}
+    .login-card{max-width:400px;}
+  }
+  @media (max-width:600px){
+    .login-left{min-height:0; padding:26px 6vw 32px;}
+    .login-logo-top img{width:150px;}
+    .welcome-text{font-size:27px;}
+    .retac-word{font-size:60px; letter-spacing:-3px;}
+    .retac-rule{margin:18px auto;}
+    .retac-description{font-size:17px;}
+    .login-right{padding:12px 5vw 34px;}
+    .login-card{padding:36px 22px 26px; border-radius:20px;}
+    .login-title{font-size:29px;}
+    .login-sub{font-size:14.5px; margin-bottom:30px;}
+    .login-field{margin-bottom:24px;}
+    .login-screen .field-icon label{font-size:13.5px;}
+    .login-screen .input-with-icon input{height:56px; font-size:14px;}
+    .login-screen .login-row{margin:-2px 0 26px;}
+    .login-screen .remember-me,.login-screen .forgot-link{font-size:13px;}
+    .login-screen .btn-login{min-height:56px; font-size:16.5px;}
+    .google-login-btn{height:56px; font-size:15px;}
+    .login-screen .login-divider{margin:26px 0 20px;}
+    .login-footer-note{padding-top:34px; font-size:12px;}
+  }
+
+  /* app shell */
+  .app{display:grid; grid-template-columns:250px 1fr; min-height:100vh;}
+  @media (max-width:880px){ .app{grid-template-columns:1fr;} .sidebar{display:none;} .topbar{padding-inline-end:110px;} }
+
+  .sidebar{
+    background:var(--navy); border-inline-end:1px solid var(--line);
+    display:flex; flex-direction:column; padding:22px 16px;
+  }
+  .brand{display:flex; align-items:center; gap:12px; padding:6px 6px 18px;}
+  .brand-mark{
+    width:38px; height:38px; border-radius:9px; background:var(--navy); color:var(--white);
+    display:flex; align-items:center; justify-content:center; font-weight:800; font-size:18px;
+    border:1px solid var(--line); overflow:hidden; padding:3px;
+  }
+  .brand-mark img{ width:100%; height:100%; object-fit:contain; }
+  .brand-name{font-weight:800; letter-spacing:2px; color:var(--white); font-size:15px;}
+  .brand-subtitle{font-size:10.5px; color:var(--secondary); margin-top:2px;}
+  .sidebar-divider{height:1px; background:var(--line); margin:6px 0 14px;}
+
+  .navigation{display:flex; flex-direction:column; gap:4px; flex:1;}
+  .nav-item{
+    display:flex; align-items:center; gap:12px; background:transparent; border:none; color:var(--secondary);
+    padding:11px 12px; border-radius:9px; font-size:13.5px; text-align:start; position:relative; width:100%;
+  }
+  .nav-item:hover{background:rgba(15,23,42,0.045); color:var(--text);}
+  .nav-item.active{background:var(--navy-light); color:var(--gold);}
+  .nav-icon{width:18px; text-align:center; font-size:14px;}
+  .notification-badge{
+    background:var(--danger); color:#fff; font-size:10px; font-weight:700; border-radius:100px;
+    padding:1px 6px; margin-inline-start:auto;
+  }
+
+  .sidebar-bottom{padding-top:14px; border-top:1px solid var(--line);}
+  .system-status{display:flex; align-items:center; gap:10px; margin-bottom:8px;}
+  .status-dot{width:7px; height:7px; border-radius:50%; background:var(--success); box-shadow:0 0 6px var(--success);}
+  .status-title{font-size:12px; color:var(--text);}
+  .status-subtitle{font-size:10.5px; color:var(--secondary);}
+  .version{font-size:10px; color:var(--secondary); opacity:.7;}
+
+  /* main content */
+  .main-content{padding:0; overflow-x:hidden;}
+  .topbar{
+    display:flex; align-items:center; justify-content:space-between;
+    padding-block:20px; padding-inline-start:30px; padding-inline-end:150px;
+    border-bottom:1px solid var(--line); background:rgba(255,255,255,0.7); position:sticky; top:0; z-index:10; backdrop-filter:blur(6px);
+  }
+  .page-title{font-size:19px; font-weight:700; color:var(--white);}
+  .page-description{font-size:12px; color:var(--secondary); margin-top:2px;}
+  .topbar-right{display:flex; align-items:center; gap:16px;}
+  .notification-button{
+    position:relative; background:var(--navy-light); border:1px solid var(--line); border-radius:9px;
+    width:38px; height:38px; display:flex; align-items:center; justify-content:center; color:var(--text); font-size:16px;
+  }
+  .notification-button .notification-badge{position:absolute; top:-5px; inset-inline-start:-5px; margin:0;}
+  .user-profile{display:flex; align-items:center; gap:10px;}
+  .user-avatar{width:34px; height:34px; border-radius:50%; background:var(--gold); color:var(--white); display:flex; align-items:center; justify-content:center; font-weight:800; font-size:13px;}
+  #userName{font-size:12.5px; color:var(--white); font-weight:600;}
+  #userRole{font-size:10.5px; color:var(--secondary);}
+
+  .page{display:none; padding:26px 30px 50px;}
+  .page.active-page{display:block;}
+
+  /* welcome */
+  .welcome-section{display:flex; align-items:flex-end; justify-content:space-between; gap:20px; flex-wrap:wrap; margin-bottom:22px;}
+  .welcome-label{font-size:11px; letter-spacing:2px; color:var(--gold); font-weight:700; margin-bottom:6px;}
+  .welcome-section h1{font-size:24px; color:var(--white); margin:0 0 8px;}
+  .welcome-section p{font-size:13px; color:var(--secondary); margin:0; max-width:520px;}
+  .welcome-date{font-size:12px; color:var(--secondary);}
+
+  /* KPI */
+  .kpi-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:24px;}
+  @media (max-width:800px){.kpi-grid{grid-template-columns:repeat(2,1fr);}}
+  .kpi-card{
+    background:var(--navy); border:1px solid var(--line); border-radius:12px; padding:18px;
+    display:flex; align-items:center; gap:14px; box-shadow:0 2px 10px rgba(15,23,42,0.03);
+  }
+  .kpi-icon{
+    width:42px; height:42px; border-radius:10px; background:var(--navy-light); color:var(--gold);
+    display:flex; align-items:center; justify-content:center; font-weight:800; font-size:12px; flex-shrink:0;
+  }
+  .kpi-icon.active-icon{color:var(--success);}
+  .kpi-icon.warning-icon{color:var(--warning);}
+  .kpi-icon.danger-icon{color:var(--danger);}
+  .kpi-label{font-size:11px; color:var(--secondary); margin-bottom:4px;}
+  .kpi-value{font-size:22px; font-weight:800; color:var(--white);}
+
+  /* search / cards */
+  .search-card, .panel{
+    background:var(--navy); border:1px solid var(--line); border-radius:14px; padding:20px; margin-bottom:20px;
+    box-shadow:0 2px 10px rgba(15,23,42,0.03);
+  }
+  .section-heading h2{margin:0 0 4px; font-size:15px; color:var(--white);}
+  .section-heading p{margin:0; font-size:11.5px; color:var(--secondary);}
+  .search-box-wrapper{position:relative; margin-top:14px;}
+  .search-symbol{position:absolute; inset-inline-start:14px; top:50%; transform:translateY(-50%); color:var(--secondary);}
+  .contract-search{
+    width:100%; background:var(--navy-light); border:1px solid var(--line); border-radius:9px;
+    padding:11px 40px; color:var(--white); font-size:13.5px; outline:none;
+  }
+  .contract-search:focus{border-color:var(--gold);}
+  .clear-search{position:absolute; inset-inline-end:12px; top:50%; transform:translateY(-50%); background:transparent; border:none; color:var(--secondary); font-size:18px;}
+  .search-empty{text-align:center; padding:30px; color:var(--secondary);}
+  .empty-icon{font-size:22px; margin-bottom:6px;}
+  .empty-title{color:var(--white); font-size:13px; margin-bottom:4px;}
+  .empty-text{font-size:11.5px;}
+
+  .content-grid{display:grid; grid-template-columns:1.6fr 1fr; gap:18px;}
+  @media (max-width:880px){.content-grid{grid-template-columns:1fr;}}
+  .panel-header{display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;}
+  .text-button{background:transparent; border:none; color:var(--gold); font-size:12px; font-weight:600;}
+
+  .activity-list{display:flex; flex-direction:column; gap:10px;}
+  .activity-loading{color:var(--secondary); font-size:12.5px; padding:14px 0;}
+  .activity-item{
+    display:flex; justify-content:space-between; gap:10px; padding:10px 12px; background:var(--navy-light);
+    border-radius:9px; font-size:12.5px; border:1px solid var(--line);
+  }
+  .activity-item .who{color:var(--white); font-weight:600;}
+  .activity-item .what{color:var(--secondary); margin-top:3px;}
+  .activity-item .when{color:var(--secondary); font-size:11px; white-space:nowrap;}
+  .activity-item.unread{border-color:var(--gold);}
+
+  .status-overview{display:flex; flex-direction:column; gap:10px;}
+  .status-row{display:flex; justify-content:space-between; font-size:13px; color:var(--secondary); padding:8px 0; border-bottom:1px solid var(--line);}
+  .status-row strong{color:var(--white);}
+
+  /* contracts list */
+  .contracts-filter-tabs{display:flex; gap:6px; background:var(--navy-light); padding:4px; border-radius:9px;}
+  .filter-tab{background:transparent; border:none; color:var(--secondary); font-size:12px; font-weight:600; padding:7px 12px; border-radius:7px;}
+  .filter-tab.active{background:var(--gold); color:var(--white);}
+
+  .contracts-list{display:flex; flex-direction:column; gap:12px;}
+  .contract-row{
+    background:var(--navy-light); border:1px solid var(--line); border-radius:12px; padding:16px 18px;
+    display:flex; flex-direction:column; gap:10px; cursor:pointer; transition:.15s;
+  }
+  .contract-row:hover{border-color:var(--gold);}
+  .contract-row-top{display:flex; justify-content:space-between; align-items:flex-start; gap:10px; flex-wrap:wrap;}
+  .contract-company{font-size:14.5px; font-weight:700; color:var(--white);}
+  .contract-sub{font-size:11px; color:var(--secondary); margin-top:2px;}
+  .status-pill{font-size:10.5px; font-weight:700; padding:4px 10px; border-radius:100px; white-space:nowrap;}
+  .status-pill.Active{background:rgba(46,155,93,0.16); color:var(--success);}
+  .status-pill.Upcoming{background:rgba(185,130,31,0.16); color:var(--warning);}
+  .status-pill.Expired{background:rgba(209,79,79,0.16); color:var(--danger);}
+  .status-pill.Unknown{background:rgba(124,135,152,0.16); color:var(--secondary);}
+  .rate-strip{display:flex; gap:8px; flex-wrap:wrap;}
+  .rate-chip{background:var(--navy); border:1px dashed var(--line); border-radius:8px; padding:6px 10px; font-size:11.5px; color:var(--secondary);}
+  .rate-chip b{color:var(--gold); font-weight:700;}
+
+  /* role / status pills reused for users page */
+  .role-pill{font-size:10.5px; font-weight:700; padding:4px 10px; border-radius:100px; white-space:nowrap; background:rgba(38,96,168,0.14); color:var(--gold);}
+  .custom-pill{font-size:10.5px; font-weight:700; padding:4px 10px; border-radius:100px; white-space:nowrap; background:rgba(46,155,93,0.12); color:var(--success); border:1px dashed rgba(46,155,93,0.4);}
+  .status-pill.on{background:rgba(46,155,93,0.16); color:var(--success);}
+  .status-pill.off{background:rgba(209,79,79,0.16); color:var(--danger);}
+
+  /* placeholder */
+  .placeholder-page{text-align:center; padding:70px 20px; color:var(--secondary);}
+  .placeholder-icon{
+    width:52px; height:52px; border-radius:12px; background:var(--navy-light); color:var(--gold);
+    display:flex; align-items:center; justify-content:center; font-weight:800; margin:0 auto 14px;
+  }
+  .placeholder-page h2{color:var(--white); font-size:16px; margin:0 0 6px;}
+
+  /* history */
+  .history-list{display:flex; flex-direction:column; gap:10px;}
+  .history-item{background:var(--navy-light); border:1px solid var(--line); border-radius:10px; padding:14px 16px; font-size:12.5px;}
+  .history-top{display:flex; justify-content:space-between; color:var(--secondary); font-size:11px; margin-bottom:6px;}
+  .history-company{color:var(--white); font-weight:700; margin-bottom:6px;}
+  .chg{display:block; color:var(--secondary); line-height:1.8;}
+  .chg b{color:var(--text);}
+  .chg .old{color:var(--danger); text-decoration:line-through; opacity:.75;}
+  .chg .new{color:var(--success); font-weight:700;}
+
+  /* modal */
+  .modal{position:fixed; inset:0; z-index:100; display:flex; align-items:center; justify-content:center; padding:20px;}
+  .modal-overlay{position:absolute; inset:0; background:rgba(15,23,42,0.45); backdrop-filter:blur(2px);}
+  .modal-container{
+    position:relative; background:var(--navy); border:1px solid var(--line); border-radius:16px;
+    padding:26px; width:100%; max-width:600px; max-height:88vh; overflow:auto;
+    box-shadow:0 24px 60px rgba(15,23,42,0.18);
+  }
+  .modal-close{position:absolute; top:14px; inset-inline-end:16px; background:transparent; border:none; color:var(--secondary); font-size:22px;}
+  .modal-title{font-size:17px; color:var(--white); margin:0 0 4px; font-weight:700;}
+  .modal-sub{font-size:11.5px; color:var(--secondary); margin-bottom:18px;}
+  .field{margin-bottom:14px;}
+  .field label{display:block; font-size:11.5px; font-weight:700; color:var(--gold); margin-bottom:6px;}
+  .field input, .field textarea, .field select{
+    width:100%; background:var(--navy-light); border:1px solid var(--line); border-radius:9px;
+    padding:10px 12px; color:var(--white); font-size:13.5px; outline:none;
+  }
+  .field input:focus, .field textarea:focus, .field select:focus{border-color:var(--gold);}
+  .field-grid{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
+  .field-grid.cols-3{grid-template-columns:1fr 1fr 1fr;}
+  textarea{resize:vertical; min-height:60px;}
+  .modal-actions{display:flex; justify-content:flex-end; gap:10px; margin-top:16px;}
+  .btn{border:none; border-radius:9px; padding:11px 18px; font-weight:700; font-size:13.5px;}
+  .btn-primary{background:var(--gold); color:var(--white);}
+  .btn-primary:hover{background:var(--gold-soft);}
+  .btn-ghost{background:transparent; color:var(--text); border:1px solid var(--line);}
+  .btn-danger{background:transparent; color:var(--danger); border:1px solid rgba(209,79,79,0.4);}
+  .btn:disabled{opacity:.5;}
+  .view-only-note{font-size:11.5px; color:var(--secondary); background:var(--navy-light); border:1px solid var(--line); border-radius:9px; padding:10px 12px; margin-bottom:14px;}
+
+  /* per-user permission override selects */
+  .perm-hint{font-size:10.5px; color:var(--secondary); margin-top:4px;}
+  .overrides-heading{font-size:11.5px; font-weight:700; color:var(--gold); margin:18px 0 10px; padding-top:14px; border-top:1px solid var(--line);}
+
+  /* users list row (reuses contract-row look) */
+  .user-row{
+    background:var(--navy-light); border:1px solid var(--line); border-radius:12px; padding:14px 18px;
+    display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
+  }
+  .user-row-left{display:flex; flex-direction:column; gap:2px;}
+  .user-row-name{font-size:14px; font-weight:700; color:var(--white);}
+  .user-row-sub{font-size:11px; color:var(--secondary);}
+  .user-row-right{display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
+  .icon-btn{background:var(--navy); border:1px solid var(--line); color:var(--text); border-radius:7px; padding:7px 10px; font-size:11.5px;}
+  .icon-btn:hover{border-color:var(--gold); color:var(--gold);}
+
+  /* roles & permissions matrix */
+  .role-card{background:var(--navy-light); border:1px solid var(--line); border-radius:12px; padding:16px 18px; display:flex; flex-direction:column; gap:12px;}
+  .role-card-title{font-size:14.5px; font-weight:700; color:var(--white);}
+  .perm-toggle-row{display:flex; flex-wrap:wrap; gap:16px;}
+  .perm-toggle{display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--text);}
+  .perm-toggle input{width:16px; height:16px; accent-color:var(--gold);}
+  .role-card-actions{display:flex; justify-content:flex-end;}
+
+  /* toast */
+  .toast{
+    position:fixed; bottom:24px; left:50%; transform:translateX(-50%); background:var(--navy); border:1px solid var(--gold);
+    color:var(--white); padding:12px 22px; border-radius:100px; font-size:13px; z-index:150; opacity:0; transition:.25s;
+    pointer-events:none; box-shadow:0 10px 30px rgba(15,23,42,0.15);
+  }
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(-4px);}
+  .toast.error{border-color:var(--danger); color:var(--danger);}
+  /* ===================== Contract document view (formal agreement look) ===================== */
+.contract-doc{ padding:6px 2px 10px; color:var(--white); }
+.doc-header{ display:flex; justify-content:flex-end; margin-bottom:14px; }
+.doc-brand{ font-weight:800; font-size:15px; color:var(--gold); letter-spacing:1px; text-align:end; }
+.doc-brand-sub{ font-size:10px; color:var(--secondary); text-align:end; margin-top:2px; }
+.doc-title{
+  font-weight:800; font-size:15px; text-decoration:underline; text-align:center;
+  line-height:1.55; margin:4px 0 22px; color:var(--white);
+}
+.doc-section{ margin-bottom:18px; }
+.doc-section-title{ font-weight:800; font-size:13px; margin-bottom:8px; color:var(--white); }
+.doc-section-title.doc-underline{ text-decoration:underline; }
+.doc-list{ margin:0; padding-inline-start:20px; list-style:square; }
+.doc-list li{ font-size:12.5px; line-height:1.7; margin-bottom:4px; color:var(--text); }
+
+.doc-rate-table{ width:100%; border-collapse:collapse; margin:8px 0 4px; font-size:12px; }
+.doc-rate-table th, .doc-rate-table td{ border:1.3px solid var(--line); padding:8px 9px; text-align:center; }
+.doc-rate-table thead th{ background:var(--navy-light); font-weight:800; color:var(--white); }
+.doc-rate-table tbody td:first-child{ font-weight:700; text-align:start; background:var(--navy-light); color:var(--white); }
+.doc-rate-table tbody td b{ color:var(--gold); }
+
+/* ===================== room-rate editor (edit / create mode) ===================== */
+.room-type-block{
+  border:1px solid var(--line); border-radius:10px; padding:12px 14px 14px;
+  margin-bottom:14px; background:var(--navy-light);
+}
+.room-type-block-head{ display:flex; gap:10px; margin-bottom:10px; }
+.room-type-name-input{
+  flex:1; background:var(--navy); border:1px solid var(--line); border-radius:8px;
+  padding:9px 11px; color:var(--white); font-weight:700; font-size:13px; outline:none;
+}
+.room-type-name-input:focus{ border-color:var(--gold); }
+.room-rate-table{ width:100%; border-collapse:collapse; }
+.room-rate-table th{ font-size:10.5px; color:var(--secondary); text-align:start; padding:4px 6px; font-weight:600; }
+.room-rate-table td{ padding:4px 6px; }
+.room-rate-table td input{
+  width:100%; background:var(--navy); border:1px solid var(--line); border-radius:6px;
+  padding:7px 8px; color:var(--white); font-size:12.5px; outline:none;
+}
+room-type-name-fixed{
+  font-weight:700; font-size:13px; color:var(--white);
+  background:var(--navy); border:1px solid var(--line); border-radius:8px;
+  padding:9px 11px;
+}
+.room-rate-table td input:focus{ border-color:var(--gold); }
+
+/* wider modal for the document view */
+.modal-container{ max-width:660px; }
+
+/* print: show only the contract document */
+@media print{
+  body *{ visibility:hidden; }
+  #contractModalContent, #contractModalContent *{ visibility:visible; }
+  #contractModalContent{ position:absolute; inset:0; width:100%; padding:20px; }
+  .modal-actions{ display:none !important; }
+  .modal-container, .modal-overlay{ box-shadow:none; background:#fff; }
+}
+/* ===================== Facebook-style notifications ===================== */
+.fb-notif-item{
+  display:flex; align-items:flex-start; gap:12px; padding:13px 14px; border-radius:10px;
+  cursor:pointer; position:relative; transition:.15s; margin-bottom:4px;
+}
+.fb-notif-item:hover{ background:var(--navy-light); }
+.fb-notif-item.unread{ background:rgba(38,96,168,0.10); border-inline-start:3px solid var(--gold); padding-inline-start:11px; }
+.fb-notif-icon{
+  width:42px; height:42px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+  font-size:17px; flex-shrink:0; color:#fff; box-shadow:0 2px 6px rgba(15,23,42,0.12);
+}
+.fb-notif-icon.type-created{ background:var(--success); }
+.fb-notif-icon.type-updated{ background:var(--gold); }
+.fb-notif-icon.type-deleted{ background:var(--danger); }
+.fb-notif-body{ flex:1; min-width:0; padding-inline-end:16px; }
+.fb-notif-text{ font-size:13px; color:var(--text); line-height:1.5; }
+.fb-notif-text b{ color:var(--white); font-weight:800; }
+.fb-notif-time{ font-size:11.5px; color:var(--gold); font-weight:700; margin-top:4px; }
+.fb-notif-dot{
+  width:10px; height:10px; border-radius:50%; background:var(--gold);
+  position:absolute; top:18px; inset-inline-end:14px; box-shadow:0 0 0 3px var(--navy);
+}
+</style>
+<style>#loginScreen,[data-page=users],#page-users,#pageUsers,#logoutBtn,button[onclick="doLogout()"]{display:none!important}</style>
+<style>
+html[data-suite-embedded]{--suite-bg:#061525;--suite-panel:#0a223c;--suite-input:#071a2e;--suite-text:#eef4ff;--suite-muted:#98abc3;--suite-line:#1c466b;--suite-gold:#d8aa48;--navy-dark:var(--suite-bg);--navy:var(--suite-panel);--navy-light:#0d2947;--bg:var(--suite-bg);--ink:var(--suite-text);--white:var(--suite-text);--text:var(--suite-text);--secondary:var(--suite-muted);--muted:var(--suite-muted);--line:var(--suite-line);--gold:var(--suite-gold);--gold-soft:#c99734}
+html[data-suite-embedded][data-theme="light"]{--suite-bg:#f3f6fa;--suite-panel:#fff;--suite-input:#f7f9fc;--suite-text:#142840;--suite-muted:#60758a;--suite-line:#d2dfe8;--suite-gold:#b98522;--navy-light:#e9f2fb}
+html[data-suite-embedded],html[data-suite-embedded] body{margin:0!important;padding:0!important;min-height:0!important;background:var(--suite-bg)!important;color:var(--suite-text)!important;font-family:Tahoma,Arial,sans-serif!important;overflow-x:hidden}
+html[data-suite-embedded] .lang-toggle-fixed,html[data-suite-embedded] .sidebar,html[data-suite-embedded] .topbar,html[data-suite-embedded] .hero,html[data-suite-embedded] #navBackdrop,html[data-suite-embedded] #appRoot>header,html[data-suite-embedded] #appRoot>.tabs,html[data-suite-embedded] .welcome-section{display:none!important}
+html[data-suite-embedded] .app{grid-template-columns:1fr!important;min-height:0!important}
+html[data-suite-embedded] .workspace,html[data-suite-embedded] .main-content,html[data-suite-embedded] #appRoot{margin:0!important;padding:0!important;width:100%!important;max-width:none!important;min-height:0!important;border:0!important;border-radius:0!important;background:var(--suite-bg)!important}
+html[data-suite-embedded] .container{max-width:none!important;padding:20px!important}html[data-suite-embedded] .workspace>main,html[data-suite-embedded] .main-content>.page{padding:20px!important}
+html[data-suite-embedded] .card,html[data-suite-embedded] .panel,html[data-suite-embedded] .kpi-card,html[data-suite-embedded] .metric,html[data-suite-embedded] .insight,html[data-suite-embedded] .insight-card,html[data-suite-embedded] .modal-content,html[data-suite-embedded] .modal-card,html[data-suite-embedded] dialog,html[data-suite-embedded] .app-dialog{background:var(--suite-panel)!important;color:var(--suite-text)!important;border:1px solid var(--suite-line)!important;border-radius:12px!important;box-shadow:0 8px 24px #00000012!important}
+html[data-suite-embedded] input,html[data-suite-embedded] select,html[data-suite-embedded] textarea{background:var(--suite-input)!important;color:var(--suite-text)!important;border-color:var(--suite-line)!important;border-radius:8px!important}
+html[data-suite-embedded] h1,html[data-suite-embedded] h2,html[data-suite-embedded] h3,html[data-suite-embedded] label,html[data-suite-embedded] td,html[data-suite-embedded] .metric strong,html[data-suite-embedded] .kpi-value,html[data-suite-embedded] .section-title{color:var(--suite-text)!important}
+html[data-suite-embedded] table{background:var(--suite-panel)!important;color:var(--suite-text)!important}html[data-suite-embedded] th{background:var(--suite-input)!important;color:var(--suite-gold)!important}html[data-suite-embedded] td{border-color:var(--suite-line)!important;background:transparent!important}html[data-suite-embedded] tbody tr:hover{background:var(--suite-input)!important}
+html[data-suite-embedded] button{font-family:inherit!important;border-radius:8px}html[data-suite-embedded] button:not(.gold):not(.danger):not(.btn-danger):not(.primary):not(.icon-button):not(.nav-button):not(.nav-item){background:var(--suite-input);color:var(--suite-text);border-color:var(--suite-line)}html[data-suite-embedded] .gold,html[data-suite-embedded] .primary,html[data-suite-embedded] .btn-primary{background:linear-gradient(135deg,#e3b858,#c99734)!important;color:#071423!important}
+html[data-suite-embedded] .muted,html[data-suite-embedded] .kpi-label,html[data-suite-embedded] .page-description,html[data-suite-embedded] .metric small{color:var(--suite-muted)!important}
+@media(max-width:650px){html[data-suite-embedded] .container,html[data-suite-embedded] .workspace>main,html[data-suite-embedded] .main-content>.page{padding:12px!important}}
+@media print{html[data-suite-embedded],html[data-suite-embedded] body{background:white!important;color:black!important}html[data-suite-embedded] .panel,html[data-suite-embedded] table,html[data-suite-embedded] td{background:white!important;color:black!important}}
+
+html[data-suite-embedded] [hidden]{display:none!important}
+html[data-suite-embedded] .autocomplete-dropdown{background:var(--suite-panel)!important;border-color:var(--suite-line)!important;color:var(--suite-text)!important}
+html[data-suite-embedded] .autocomplete-item,html[data-suite-embedded] .autocomplete-item b{color:var(--suite-text)!important;border-color:var(--suite-line)!important}html[data-suite-embedded] .autocomplete-item small{color:var(--suite-muted)!important}html[data-suite-embedded] .autocomplete-item:hover{background:var(--suite-input)!important}
+html[data-suite-embedded="stock"] .cards{margin:0 0 20px!important;transform:none!important;position:static!important}
+html[data-suite-embedded="stock"] .content-grid{grid-template-columns:minmax(0,1fr)!important}
+html[data-suite-embedded="stock"] body[data-stock-page="home"] .insights{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;width:100%}
+html[data-suite-embedded] .contract-create-bar{display:flex;justify-content:flex-start;margin:0 0 18px}
+@media(max-width:700px){html[data-suite-embedded="stock"] body[data-stock-page="home"] .insights{grid-template-columns:1fr}}
+</style>
+<script>
+(function(){
+ var module='__SUITE_MODULE__',pending={},seq=0;document.documentElement.dataset.suiteEmbedded=module;
+ function refFor(name,row){
+  var source=name==='returnCustody'?searchCache.custody:name==='restoreCustodyFromArchive'?archiveCache.custody:name==='restoreLoanFromArchive'?archiveCache.loans:searchCache.loans;
+  var rec=(source||[]).find(function(r){return Number(r.rowIndex)===Number(row);});
+  if(!rec||!rec.recordId)throw new Error('حدّث البيانات قبل تنفيذ العملية.');
+  return {recordId:rec.recordId,version:rec.recordVersion};
+ }
+ function run(ok,fail,user){return new Proxy({}, {get:function(_,name){
+  if(name==='withSuccessHandler')return function(f){return run(f,fail,user);};
+  if(name==='withFailureHandler')return function(f){return run(ok,f,user);};
+  if(name==='withUserObject')return function(v){return run(ok,fail,v);};
+  return function(){var args=Array.from(arguments);
+   try{
+    if(module==='custody'){
+     if(['returnCustody','acceptLoan','rejectLoan','markLoanPaid','restoreLoanFromArchive','restoreCustodyFromArchive'].indexOf(name)>=0)args[0]=refFor(name,args[0]);
+     if(name==='updateLoan')args[0].recordRef=refFor(name,args[0].rowIndex);
+    }
+    var id=module+'-'+(++seq);pending[id]={ok:ok,fail:fail,user:user,timer:setTimeout(function(){var p=pending[id];delete pending[id];if(p&&p.fail)p.fail(new Error('انتهت مهلة الاتصال. حدّث البيانات قبل إعادة تنفيذ الحفظ.'),p.user);},180000)};
+    parent.postMessage({type:'retac-suite-rpc',module:module,id:id,method:name,args:args},'*');
+   }catch(e){if(fail)fail(e,user);else console.error(e);}
+  };
+ }});}
+ window.addEventListener('message',function(e){if(e.source!==parent||!e.data||e.data.type!=='retac-suite-result')return;
+  var d=e.data,p=pending[d.id];if(!p)return;clearTimeout(p.timer);delete pending[d.id];
+  if(d.error){if(p.fail)p.fail(new Error(d.error),p.user);else console.error(d.error);}else if(p.ok)p.ok(d.result,p.user);
+ });
+ var navSelectors={stock:{home:'#homeNav',review:'#reviewTab',add:'#add',import:'#importOpen',reports:'#reportsNav',settings:'#settingsNav',archive:'#archiveTab'},contracts:{dashboard:'.nav-item[data-page="dashboard"]',contracts:'.nav-item[data-page="contracts"]',notifications:'.nav-item[data-page="notifications"]',history:'.nav-item[data-page="history"]'},custody:{search:'.tab[data-page="search"]',custody:'.tab[data-page="custody"]',loan:'.tab[data-page="loan"]',archive:'.tab[data-page="archive"]',audit:'.tab[data-page="audit"]'}};
+ var deferredPage=null,loaded=false;
+ function navigate(page){var selector=navSelectors[module]&&navSelectors[module][page];if(!selector)return;var button=document.querySelector(selector);if(!loaded||!button||button.disabled){deferredPage=page;return;}deferredPage=null;button.click();window.scrollTo(0,0);}
+ window.addEventListener('message',function(e){var d=e.data;if(e.source!==parent||!d||d.module!==module)return;if(d.type==='retac-suite-context'){document.documentElement.dataset.theme=d.theme==='light'?'light':'dark';if(window.suiteSetModuleLanguage)window.suiteSetModuleLanguage(d.language);}if(d.type==='retac-suite-nav')navigate(d.page);});
+ document.addEventListener('click',function(e){var button=e.target.closest('.nav-button,.nav-item[data-page],.tab[data-page],.text-button[data-page]');if(!button)return;var page=Object.keys(navSelectors[module]||{}).find(function(key){return button.matches(navSelectors[module][key]);})||button.dataset.page;if(navSelectors[module]&&navSelectors[module][page])parent.postMessage({type:'retac-suite-page',module:module,page:page},'*');});
+ window.addEventListener('load',function(){loaded=true;parent.postMessage({type:'retac-suite-ready',module:module},'*');if(deferredPage)navigate(deferredPage);new MutationObserver(function(){if(deferredPage)navigate(deferredPage);}).observe(document.body,{subtree:true,attributes:true,attributeFilter:['disabled']});var themeSetting=document.getElementById('themeSetting');if(themeSetting)themeSetting.addEventListener('change',function(){parent.postMessage({type:'retac-suite-theme',module:module,theme:themeSetting.value},'*');});});
+ window.google={script:{run:run()}};
+})();
+</script>
+
+</head>
+<body>
+
+  <!-- GLOBAL LANGUAGE TOGGLE — always visible, on top of loader / login / app -->
+  <button id="langToggleBtn" class="lang-toggle-fixed" title="Switch language / تبديل اللغة">
+    <span class="lang-icon">🌐</span><span id="langToggleLabel">العربية</span>
+  </button>
+
+  <div id="appLoader" class="app-loader">
+    <div class="loader-logo">RETAC</div>
+    <div class="loader-spinner"></div>
+    <div class="loader-text loader-dots" id="loaderMsg" data-i18n="loaderText">Contract Management System</div>
+  </div>
+
+  <!-- LOGIN SCREEN -->
+  <div id="loginScreen" class="login-screen hidden">
+    <svg class="login-bg" viewBox="0 0 1600 1000" preserveAspectRatio="none" aria-hidden="true">
+      <path class="bg-top" d="M0 0H1600V235C1360 150 1190 215 1000 285C790 363 650 337 500 215C350 92 260 42 0 0Z"/>
+      <path class="bg-main" d="M0 350C170 420 245 595 470 650C690 704 805 530 1010 430C1210 332 1410 330 1600 405V1000H0Z"/>
+      <path class="bg-wave-1" d="M0 565C175 625 280 805 505 800C720 795 820 650 1010 575C1220 492 1390 520 1600 635V1000H0Z"/>
+      <path class="bg-wave-2" d="M0 690C185 640 350 880 585 860C805 842 930 725 1110 680C1300 632 1460 700 1600 785V1000H0Z"/>
+    </svg>
+
+    <div class="login-page">
+      <div class="login-left">
+        <div class="login-logo-top">
+  <img src="https://drive.google.com/thumbnail?id=125hHTLfd6oU84e2avTacKn3_eQIoUcHB&sz=w600" alt="RETAC EL-ARISH RESORT">
+</div>
+
+        <div class="login-brand-copy">
+          <div class="welcome-text" data-i18n="loginWelcome">Welcome to</div>
+          <div class="retac-word">Retac El-Arish</div>
+          <div class="retac-rule"></div>
+          <div class="retac-description" data-i18n="loginBrandDescription">CONTRACT MANAGEMENT SYSTEM<br>Manage. Monitor. Succeed.</div>
+        </div>
+      </div>
+
+      <div class="login-right">
+        <div class="login-card">
+          <div class="login-title" data-i18n="loginTitle">Sign In</div>
+          <div class="login-sub" data-i18n="loginSub">Please sign in to continue</div>
+          <div id="loginError" class="login-error hidden"></div>
+
+          <div class="field field-icon login-field">
+            <label data-i18n="labelUsername">Username or Email</label>
+            <div class="input-with-icon">
+              <span class="input-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg></span>
+              <input id="loginUsername" type="text" autocomplete="username" data-i18n-placeholder="usernamePlaceholder" placeholder="Enter your username or email">
+            </div>
+          </div>
+
+          <div class="field field-icon login-field">
+            <label data-i18n="labelPassword">Password</label>
+            <div class="input-with-icon">
+              <span class="input-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/><circle cx="12" cy="15" r="1"/></svg></span>
+              <input id="loginPassword" type="password" autocomplete="current-password" data-i18n-placeholder="passwordPlaceholder" placeholder="Enter your password">
+              <button type="button" id="togglePasswordBtn" class="input-icon-end" tabindex="-1" aria-label="Show password"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M1.5 12s3.7-6.5 10.5-6.5S22.5 12 22.5 12 18.8 18.5 12 18.5 1.5 12 1.5 12Z"/><circle cx="12" cy="12" r="3"/></svg></button>
+            </div>
+          </div>
+
+          <div class="login-row">
+            <label class="remember-me"><input type="checkbox" id="rememberMeChk"><span data-i18n="rememberMe">Remember me</span></label>
+            <a href="#" class="forgot-link" id="forgotPasswordLink" data-i18n="forgotPassword">Forgot password?</a>
+          </div>
+
+          <button id="loginBtn" class="btn btn-login"><span data-i18n="signIn">Sign In</span><svg viewBox="0 0 24 24" width="29" height="29" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 12h15M13 6l6 6-6 6"/></svg></button>
+
+          <div class="login-footer-note">© 2026 Retac El-Arish Resort. <span data-i18n="allRightsReserved">All rights reserved.</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="app" class="app hidden">
+
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark"><img src="https://drive.google.com/thumbnail?id=1_N56wn06cahMh7vlnDBsxnrZj7hsTtzu&sz=w1000" alt="RETAC EL-ARISH"></div>
+        <div>
+          <div class="brand-name">RETAC</div>
+          <div class="brand-subtitle" data-i18n="brandSubtitle">Contract Management</div>
+        </div>
+      </div>
+
+      <div class="sidebar-divider"></div>
+
+      <nav class="navigation">
+        <button class="nav-item active" data-page="dashboard"><span class="nav-icon">▦</span><span data-i18n="navDashboard">Dashboard</span></button>
+        <button class="nav-item" data-page="contracts"><span class="nav-icon">▤</span><span data-i18n="navContracts">Contracts</span></button>
+        <button class="nav-item" data-page="notifications">
+          <span class="nav-icon">🔔</span><span data-i18n="navNotifications">Notifications</span>
+          <span id="notificationBadge" class="notification-badge hidden">0</span>
+        </button>
+        <button class="nav-item" data-page="history"><span class="nav-icon">◷</span><span data-i18n="navHistory">History</span></button>
+        <button class="nav-item hidden" id="usersNavItem" data-page="users"><span class="nav-icon">☺</span><span data-i18n="navUsers">Users</span></button>
+      </nav>
+
+      <div class="sidebar-bottom">
+        <button id="logoutBtn" class="nav-item" style="margin-bottom:10px;"><span class="nav-icon">⏻</span><span data-i18n="logout">Log Out</span></button>
+        <div class="system-status">
+          <span class="status-dot"></span>
+          <div>
+            <div class="status-title" data-i18n="systemOnline">System Online</div>
+            <div class="status-subtitle" data-i18n="internalSystem">RETAC Internal System</div>
+          </div>
+        </div>
+        <div class="version" data-i18n="simpleEdition">Simple Edition</div>
+      </div>
+    </aside>
+
+    <main class="main-content">
+
+      <header class="topbar">
+        <div>
+          <div class="page-title" id="pageTitle">Dashboard</div>
+          <div class="page-description" id="pageDescription">Contract Management & Monitoring</div>
+        </div>
+        <div class="topbar-right">
+          <button class="notification-button" id="notificationButton" title="Notifications">
+            <span class="notification-icon">🔔</span>
+            <span id="topNotificationBadge" class="notification-badge hidden">0</span>
+          </button>
+          <div class="user-profile">
+            <div class="user-avatar" id="userAvatar">U</div>
+            <div>
+              <div id="userName">System User</div>
+              <div id="userRole">User</div>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <!-- DASHBOARD -->
+      <section id="dashboardPage" class="page active-page">
+
+        <div class="welcome-section">
+          <div>
+            <div class="welcome-label" data-i18n="welcomeLabelDashboard">RETAC EL ARISH</div>
+            <h1 data-i18n="dashboardH1">Contract Management System</h1>
+            <p data-i18n="dashboardP">Manage, review and monitor company contracts and contracted rates from one place.</p>
+          </div>
+          <div class="welcome-date" id="currentDate"></div>
+        </div>
+
+        <div class="kpi-grid">
+          <div class="kpi-card"><div class="kpi-icon">CT</div><div><div class="kpi-label" data-i18n="kpiTotal">Total Contracts</div><div class="kpi-value" id="totalContracts">0</div></div></div>
+          <div class="kpi-card"><div class="kpi-icon active-icon">AC</div><div><div class="kpi-label" data-i18n="kpiActive">Active</div><div class="kpi-value" id="activeContracts">0</div></div></div>
+          <div class="kpi-card"><div class="kpi-icon warning-icon">UP</div><div><div class="kpi-label" data-i18n="kpiUpcoming">Upcoming</div><div class="kpi-value" id="upcomingContracts">0</div></div></div>
+          <div class="kpi-card"><div class="kpi-icon danger-icon">EX</div><div><div class="kpi-label" data-i18n="kpiExpired">Expired</div><div class="kpi-value" id="expiredContracts">0</div></div></div>
+        </div>
+
+        <div class="search-card">
+          <div class="section-heading">
+            <h2 data-i18n="searchContractsTitle">Search Contracts</h2>
+            <p data-i18n="searchContractsSub">Search by company name</p>
+          </div>
+          <div class="search-box-wrapper">
+            <span class="search-symbol">⌕</span>
+            <input type="text" id="contractSearch" class="contract-search" data-i18n-placeholder="searchPlaceholder" placeholder="Search company name..." autocomplete="off">
+            <button id="clearSearch" class="clear-search hidden">×</button>
+          </div>
+          <div id="searchResults" class="contracts-list hidden" style="margin-top:14px;"></div>
+          <div id="searchEmpty" class="search-empty hidden">
+            <div class="empty-icon">—</div>
+            <div class="empty-title" data-i18n="noContractsFound">No contracts found</div>
+            <div class="empty-text" data-i18n="tryOtherSearch">Try searching with another company name.</div>
+          </div>
+        </div>
+
+        <div class="content-grid">
+          <div class="panel">
+            <div class="panel-header">
+              <div><h2 data-i18n="recentUpdatesTitle">Recent Contract Updates</h2><p data-i18n="recentUpdatesSub">Latest activity on contracts</p></div>
+              <button class="text-button" data-page="history" data-i18n="viewAll">View All</button>
+            </div>
+            <div id="recentActivity" class="activity-list"><div class="activity-loading">Loading...</div></div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-header"><div><h2 data-i18n="systemStatusTitle">System Status</h2><p data-i18n="systemStatusSub">Current contract overview</p></div></div>
+            <div class="status-overview">
+              <div class="status-row"><span data-i18n="kpiActive">Active</span><strong id="statusActive">0</strong></div>
+              <div class="status-row"><span data-i18n="kpiUpcoming">Upcoming</span><strong id="statusUpcoming">0</strong></div>
+              <div class="status-row"><span data-i18n="kpiExpired">Expired</span><strong id="statusExpired">0</strong></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- CONTRACTS -->
+      <section id="contractsPage" class="page">
+<div class="contract-create-bar"><button class="btn btn-primary" id="addContractBtn" style="display:none;" data-i18n="newContractBtn">+ New Contract</button></div>
+        <div class="welcome-section">
+          <div>
+            <div class="welcome-label" data-i18n="welcomeLabelContracts">ALL CONTRACTS</div>
+            <h1 style="font-size:22px;" data-i18n="contractsH1">Contracts</h1>
+            <p data-i18n="contractsP">Browse, filter and open any contract in the system.</p>
+          </div>
+          
+        </div>
+
+        <div class="search-card">
+          <div class="section-heading" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:14px;">
+            <div><h2 data-i18n="allContractsTitle">All Contracts</h2><p id="contractsListCount">Loading...</p></div>
+            <div class="contracts-filter-tabs">
+              <button class="filter-tab active" data-status="All" data-i18n="filterAll">All</button>
+              <button class="filter-tab" data-status="Active" data-i18n="filterActive">Active</button>
+              <button class="filter-tab" data-status="Upcoming" data-i18n="filterUpcoming">Upcoming</button>
+              <button class="filter-tab" data-status="Expired" data-i18n="filterExpired">Expired</button>
+            </div>
+          </div>
+          <div id="contractsListContainer" class="contracts-list" style="margin-top:18px;">
+            <div class="activity-loading">Loading contracts...</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- NOTIFICATIONS -->
+      <section id="notificationsPage" class="page">
+        <div class="welcome-section">
+          <div>
+            <div class="welcome-label" data-i18n="welcomeLabelNotifications">UPDATES</div>
+            <h1 style="font-size:22px;" data-i18n="notificationsH1">Notifications</h1>
+            <p data-i18n="notificationsP">Every contract change, newest first. Click one to mark it as read.</p>
+          </div>
+        </div>
+        <div class="panel">
+          <div id="notificationsList" class="history-list"><div class="activity-loading">Loading...</div></div>
+        </div>
+      </section>
+
+      <!-- HISTORY -->
+      <section id="historyPage" class="page">
+        <div class="welcome-section">
+          <div>
+            <div class="welcome-label" data-i18n="welcomeLabelHistory">AUDIT TRAIL</div>
+            <h1 style="font-size:22px;" data-i18n="historyH1">Contract History</h1>
+            <p data-i18n="historyP">Full log of every contract created, modified or deleted.</p>
+          </div>
+        </div>
+        <div class="panel">
+          <div id="fullHistoryList" class="history-list"><div class="activity-loading">Loading...</div></div>
+        </div>
+      </section>
+
+      <!-- USERS (canManageUsers only) -->
+      <section id="usersPage" class="page">
+        <div class="welcome-section">
+          <div>
+            <div class="welcome-label" data-i18n="welcomeLabelUsers">ACCESS CONTROL</div>
+            <h1 style="font-size:22px;" data-i18n="usersH1">Users & Permissions</h1>
+            <p data-i18n="usersP">Create accounts, assign roles, and fine-tune what each person is allowed to do.</p>
+          </div>
+          <button class="btn btn-primary" id="addUserBtn" data-i18n="newUserBtn">+ New User</button>
+        </div>
+
+        <div class="search-card">
+          <div class="section-heading" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:14px;">
+            <div><h2 id="usersSectionTitle" data-i18n="allUsersTitle">All Users</h2><p id="usersListCount">Loading...</p></div>
+            <div class="contracts-filter-tabs">
+              <button class="filter-tab active" data-usertab="accounts" data-i18n="tabAccounts">Accounts</button>
+              <button class="filter-tab" data-usertab="roles" data-i18n="tabRoles">Roles & Permissions</button>
+            </div>
+          </div>
+          <div id="usersListContainer" class="contracts-list" style="margin-top:18px;">
+            <div class="activity-loading">Loading users...</div>
+          </div>
+          <div id="rolesListContainer" class="contracts-list hidden" style="margin-top:18px;"></div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <div id="contractModal" class="modal hidden">
+    <div class="modal-overlay"></div>
+    <div class="modal-container">
+      <button id="closeModal" class="modal-close">×</button>
+      <div id="contractModalContent"></div>
+    </div>
+  </div>
+
+  <div id="userModal" class="modal hidden">
+    <div class="modal-overlay"></div>
+    <div class="modal-container">
+      <button id="closeUserModal" class="modal-close">×</button>
+      <div id="userModalContent"></div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"><div id="toastMessage"></div></div>
+
+  <script>
+/* =====================================================================
+   I18N — English / Arabic dictionaries + helpers
+   ===================================================================== */
+const I18N = {
+  en: {
+    loaderText: 'Contract Management System',
+    brandSubtitle: 'Contract Management',
+    loginTitle: 'Sign In',
+    loginSub: 'Please Sign in to continue',
+    loginBrandSubtitle: 'CONTRACT MANAGEMENT SYSTEM',
+    loginTagline: 'Manage. Monitor. Succeed.',
+    rememberMe: 'Remember me',
+    forgotPassword: 'Forgot password?',
+    orWord: 'OR',
+    secureAccessNote: 'Secure access to RETAC internal system',
+    allRightsReserved: 'All rights reserved.',
+    labelUsername: 'Username',
+    labelPassword: 'Password',
+    usernamePlaceholder: 'e.g. sara.sales',
+    signIn: 'Sign In',
+    signingIn: 'Signing in...',
+    navDashboard: 'Dashboard',
+    navContracts: 'Contracts',
+    navNotifications: 'Notifications',
+    navHistory: 'History',
+    navUsers: 'Users',
+    logout: 'Log Out',
+    systemOnline: 'System Online',
+    internalSystem: 'RETAC Internal System',
+    simpleEdition: 'Simple Edition',
+    pageDashboardTitle: 'Dashboard', pageDashboardDesc: 'Contract Management & Monitoring',
+    pageContractsTitle: 'Contracts', pageContractsDesc: 'Browse and manage all contracts',
+    pageNotificationsTitle: 'Notifications', pageNotificationsDesc: 'Recent contract changes',
+    pageHistoryTitle: 'Contract History', pageHistoryDesc: 'Full audit trail',
+    pageUsersTitle: 'Users & Permissions', pageUsersDesc: 'Manage accounts and roles',
+    welcomeLabelDashboard: 'RETAC EL ARISH',
+    dashboardH1: 'Contract Management System',
+    dashboardP: 'Manage, review and monitor company contracts and contracted rates from one place.',
+    kpiTotal: 'Total Contracts', kpiActive: 'Active', kpiUpcoming: 'Upcoming', kpiExpired: 'Expired',
+    searchContractsTitle: 'Search Contracts', searchContractsSub: 'Search by company name',
+    searchPlaceholder: 'Search company name...',
+    noContractsFound: 'No contracts found', tryOtherSearch: 'Try searching with another company name.',
+    recentUpdatesTitle: 'Recent Contract Updates', recentUpdatesSub: 'Latest activity on contracts',
+    viewAll: 'View All',
+    systemStatusTitle: 'System Status', systemStatusSub: 'Current contract overview',
+    welcomeLabelContracts: 'ALL CONTRACTS', contractsH1: 'Contracts',
+    contractsP: 'Browse, filter and open any contract in the system.',
+    newContractBtn: '+ New Contract',
+    allContractsTitle: 'All Contracts',
+    filterAll: 'All', filterActive: 'Active', filterUpcoming: 'Upcoming', filterExpired: 'Expired',
+    noContracts: 'No contracts', tryDifferentFilter: 'Try a different filter, or add a new contract.',
+    welcomeLabelNotifications: 'UPDATES', notificationsH1: 'Notifications',
+    notificationsP: 'Every contract change, newest first. Click one to mark it as read.',
+    noNotificationsYet: 'No notifications yet.',
+    welcomeLabelHistory: 'AUDIT TRAIL', historyH1: 'Contract History',
+    historyP: 'Full log of every contract created, modified or deleted.',
+    noHistoryYet: 'No history yet.',
+    welcomeLabelUsers: 'ACCESS CONTROL', usersH1: 'Users & Permissions',
+    usersP: 'Create accounts, assign roles, and fine-tune what each person is allowed to do.',
+    newUserBtn: '+ New User',
+    tabAccounts: 'Accounts', tabRoles: 'Roles & Permissions',
+    allUsersTitle: 'All Users', rolesPermissionsTitle: 'Roles & Permissions',
+    rolesDefaultsNote: 'Defaults applied to every user of that role',
+    noUsersYet: 'No users yet', noRolesFound: 'No roles found', noActivityYet: 'No activity yet.',
+    modalNewContract: 'New Contract',
+    modalNote: 'All room rates include breakfast. Prices as entered per rate column.',
+    labelCompanyName: 'Company Name', companyPlaceholder: 'e.g. Ministry of Health',
+    labelContractNo: 'Contract No.', labelStartDate: 'Start Date', labelEndDate: 'End Date',
+    labelValidityNote: 'Validity Note (optional)',
+    validityNotePlaceholder: 'e.g. Valid from the date of acceptance till Dec 31, 2026',
+    roomTypesHeading: 'Room Types & Rates',
+    addRoomTypeBtn: '+ Add Room Type',
+    removeRoomTypeBtn: 'Remove',
+    roomTypeNamePlaceholder: 'e.g. Standard Room',
+    noRoomTypesYet: 'No room types added yet.',
+    colRoomType: 'Room Type', colOccupancy: 'Occupancy', colRack: 'Rack Rate',
+    colForeigners: 'Foreigners', colEgyptians: 'Egyptians/Resident',
+    colCorporateRate: 'Local Corporate Rate (Bed & Breakfast)',
+    labelLunchEgyptian: 'Lunch \u2014 Egyptian/Resident (EGP)',
+    labelLunchForeigner: 'Lunch \u2014 Foreigner (US$)',
+    labelDinnerEgyptian: 'Dinner \u2014 Egyptian/Resident (EGP)',
+    labelDinnerForeigner: 'Dinner \u2014 Foreigner (US$)',
+    labelNotesList: 'Notes (one per line)', notesListPlaceholder: 'One note per line...',
+    labelBenefitsList: 'Company Benefits (one per line)', benefitsListPlaceholder: 'One benefit per line...',
+    labelAvailabilityList: 'Room Availability / Terms (one per line)', availabilityListPlaceholder: 'One line per term...',
+    docAgreementTitle: 'Special corporate rates and services agreement between Retac El-Arish Hotel and {company}',
+    docContractDurationHeading: 'Contract Duration:',
+    docSpecialRateHeading: 'Special Corporate Rate:',
+    docNotesHeading: 'Notes:',
+    docBenefitsHeadingSuffix: 'benefits:',
+    docAvailabilityHeading: 'Room availability:',
+    docLunchSupplementLine: 'Lunch Supplement {eg} EGP per person per night for Egyptian & Resident, {for} $ per person per night for Foreigner.',
+    docDinnerSupplementLine: 'Dinner Supplement {eg} EGP per person per night for Egyptian & Resident, {for} $ per person per night for Foreigner.',
+    btnEditContract: 'Edit', btnPrint: 'Print',
+    btnDelete: 'Delete', btnClose: 'Close', btnSaveChanges: 'Save Changes', btnCreateContract: 'Create Contract',
+    saving: 'Saving...',
+    toastContractUpdated: 'Contract updated', toastContractCreated: 'Contract created', toastContractDeleted: 'Contract deleted',
+    toastCompanyRequired: 'Company name is required',
+    errorPrefix: 'Error: ',
+    modalEditUser: 'Edit User', modalNewUser: 'New User',
+    modalEditUserSub: 'Update display name, role or personal access.',
+    modalNewUserSub: 'Create a login for a new team member.',
+    labelUsernameField: 'Username', labelTempPassword: 'Temporary Password',
+    tempPasswordPlaceholder: 'At least 4 characters',
+    labelDisplayName: 'Display Name', displayNamePlaceholder: 'e.g. Sara Ahmed',
+    labelRole: 'Role', labelStatus: 'Status',
+    statusActiveOpt: 'Active', statusDisabledOpt: 'Disabled',
+    overridesHeading: "Personal permissions (override this user's role)",
+    btnCreateUser: 'Create User',
+    toastUserUpdated: 'User updated', toastUserCreated: 'User created',
+    toastFillAllFields: 'Please fill in all fields', toastPasswordReset: 'Password reset',
+    promptNewPassword: 'Enter a new temporary password for this user (at least 4 characters):',
+    useRoleDefault: 'Use role default', alwaysAllow: 'Always allow', alwaysDeny: 'Always deny',
+    allowWord: 'Allow', denyWord: 'Deny',
+    roleAdmin: 'Admin', roleSales: 'Sales', roleReservations: 'Reservations', roleAccounts: 'Accounts',
+    permCanAdd: 'Add contracts', permCanEdit: 'Edit contracts', permCanDelete: 'Delete contracts',
+    permCanManageUsers: 'Manage users & permissions',
+    roleDefaultForRole: 'default for this role',
+    btnSaveRole: 'Save',
+    toastRolePermissionsUpdated: 'Role permissions updated',
+    statusActive: 'Active', statusUpcoming: 'Upcoming', statusExpired: 'Expired', statusUnknown: 'Unknown',
+    fieldCompany: 'Company', fieldContractNo: 'Contract No', fieldStartDate: 'Start Date', fieldEndDate: 'End Date',
+    fieldSingle: 'Single', fieldDouble: 'Double', fieldTriple: 'Triple',
+    fieldValidityNote: 'Validity Note', fieldRoomRates: 'Room Rates',
+    fieldLunchEgyptian: 'Lunch (Egyptian)', fieldLunchForeigner: 'Lunch (Foreigner)',
+    fieldDinnerEgyptian: 'Dinner (Egyptian)', fieldDinnerForeigner: 'Dinner (Foreigner)',
+    fieldNotesList: 'Notes', fieldBenefits: 'Benefits', fieldAvailability: 'Availability',
+    fieldAttachment: 'Contract File',
+    historyContractCreated: 'Contract created', historyContractDeleted: 'Contract deleted', historyUpdatedPrefix: 'Updated: ',
+    loginFailed: 'Login failed.', loginErrorGeneric: 'Something went wrong. Please try again.',
+    pleaseLoginAgain: 'Please log in again.', pleaseEnterCreds: 'Please enter username and password',
+    noContractNumber: 'No contract number', dashSep: ' \u00b7 ',
+    languageSelf: 'English',
+    loginWelcome: 'Welcome to',
+    loginBrandDescription: 'CONTRACT MANAGEMENT SYSTEM<br>Manage. Monitor. Succeed.',
+    featureSecure: 'Secure', featureSecureSub: 'Your data is<br>always protected',
+    featureReliable: 'Reliable', featureReliableSub: 'Accurate data,<br>real-time reports',
+    featureEasy: 'Easy to Use', featureEasySub: 'Simple interface,<br>better experience',
+    orContinue: 'or continue with', googleSignIn: 'Sign in with Google', passwordPlaceholder: 'Enter your password',
+    attachmentHeading: 'Contract File (PDF)',
+    attachmentHint: 'Only PDF files are supported (max 15MB).',
+    btnRemoveFile: 'Remove file',
+    viewAttachedFile: 'View Contract File',
+    toastPdfOnly: 'Only PDF files can be uploaded',
+    toastFileTooBig: 'File is too large (max 15MB)',
+    toastAttachmentRemoved: 'File removed',
+    toastUploadingFile: 'Uploading file...',
+    fieldAttachmentChange: 'Attachment'
+  },
+  ar: {
+    loaderText: 'نظام إدارة العقود',
+    brandSubtitle: 'إدارة العقود',
+    loginTitle: 'مرحبًا بعودتك',
+    loginSub: 'سجّل دخولك لمتابعة استخدام حسابك',
+    loginBrandSubtitle: 'نظام إدارة العقود',
+    loginTagline: 'إدارة. متابعة. نجاح.',
+    rememberMe: 'تذكرني',
+    forgotPassword: 'نسيت كلمة المرور؟',
+    orWord: 'أو',
+    secureAccessNote: 'دخول آمن لنظام ريتاك الداخلي',
+    allRightsReserved: 'جميع الحقوق محفوظة.',
+    labelUsername: 'اسم المستخدم',
+    labelPassword: 'كلمة المرور',
+    usernamePlaceholder: 'مثال: sara.sales',
+    signIn: 'تسجيل الدخول',
+    signingIn: 'جارٍ تسجيل الدخول...',
+    navDashboard: 'الرئيسية',
+    navContracts: 'العقود',
+    navNotifications: 'الإشعارات',
+    navHistory: 'السجل',
+    navUsers: 'المستخدمون',
+    logout: 'تسجيل الخروج',
+    systemOnline: 'النظام متصل',
+    internalSystem: 'نظام ريتاك الداخلي',
+    simpleEdition: 'النسخة المبسطة',
+    pageDashboardTitle: 'الرئيسية', pageDashboardDesc: 'إدارة العقود ومتابعتها',
+    pageContractsTitle: 'العقود', pageContractsDesc: 'تصفح جميع العقود وإدارتها',
+    pageNotificationsTitle: 'الإشعارات', pageNotificationsDesc: 'آخر تغييرات العقود',
+    pageHistoryTitle: 'سجل العقود', pageHistoryDesc: 'سجل التدقيق الكامل',
+    pageUsersTitle: 'المستخدمون والصلاحيات', pageUsersDesc: 'إدارة الحسابات والأدوار',
+    welcomeLabelDashboard: 'فندق ريتاك العريش',
+    dashboardH1: 'نظام إدارة العقود',
+    dashboardP: 'إدارة ومراجعة ومتابعة عقود الشركات والأسعار التعاقدية من مكان واحد.',
+    kpiTotal: 'إجمالي العقود', kpiActive: 'سارية', kpiUpcoming: 'قادمة', kpiExpired: 'منتهية',
+    searchContractsTitle: 'البحث عن العقود', searchContractsSub: 'البحث باسم الشركة',
+    searchPlaceholder: 'ابحث باسم الشركة...',
+    noContractsFound: 'لا توجد عقود', tryOtherSearch: 'جرّب البحث باسم شركة آخر.',
+    recentUpdatesTitle: 'آخر تحديثات العقود', recentUpdatesSub: 'آخر الأنشطة على العقود',
+    viewAll: 'عرض الكل',
+    systemStatusTitle: 'حالة النظام', systemStatusSub: 'نظرة عامة على العقود الحالية',
+    welcomeLabelContracts: 'جميع العقود', contractsH1: 'العقود',
+    contractsP: 'تصفح وفلتر وافتح أي عقد في النظام.',
+    newContractBtn: '+ عقد جديد',
+    allContractsTitle: 'جميع العقود',
+    filterAll: 'الكل', filterActive: 'سارية', filterUpcoming: 'قادمة', filterExpired: 'منتهية',
+    noContracts: 'لا توجد عقود', tryDifferentFilter: 'جرّب فلترًا مختلفًا أو أضف عقدًا جديدًا.',
+    welcomeLabelNotifications: 'التحديثات', notificationsH1: 'الإشعارات',
+    notificationsP: 'كل تغيير في العقود، الأحدث أولاً. اضغط على أي إشعار لتحديده كمقروء.',
+    noNotificationsYet: 'لا توجد إشعارات بعد.',
+    welcomeLabelHistory: 'سجل التدقيق', historyH1: 'سجل العقود',
+    historyP: 'سجل كامل لكل عملية إنشاء أو تعديل أو حذف لعقد.',
+    noHistoryYet: 'لا يوجد سجل بعد.',
+    welcomeLabelUsers: 'التحكم بالصلاحيات', usersH1: 'المستخدمون والصلاحيات',
+    usersP: 'إنشاء الحسابات وتحديد الأدوار وضبط صلاحيات كل مستخدم.',
+    newUserBtn: '+ مستخدم جديد',
+    tabAccounts: 'الحسابات', tabRoles: 'الأدوار والصلاحيات',
+    allUsersTitle: 'جميع المستخدمين', rolesPermissionsTitle: 'الأدوار والصلاحيات',
+    rolesDefaultsNote: 'الإعدادات الافتراضية تُطبَّق على كل مستخدمي هذا الدور',
+    noUsersYet: 'لا يوجد مستخدمون بعد', noRolesFound: 'لم يتم العثور على أدوار', noActivityYet: 'لا يوجد نشاط بعد.',
+    modalNewContract: 'عقد جديد',
+    modalNote: 'كل أسعار الغرف شاملة الإفطار. الأسعار كما هي في كل عمود سعر.',
+    labelCompanyName: 'اسم الشركة', companyPlaceholder: 'مثال: وزارة الصحة',
+    labelContractNo: 'رقم العقد', labelStartDate: 'تاريخ البداية', labelEndDate: 'تاريخ النهاية',
+    labelValidityNote: 'ملاحظة مدة العقد (اختياري)',
+    validityNotePlaceholder: 'مثال: سارٍ من تاريخ القبول حتى 31 ديسمبر 2026',
+    roomTypesHeading: 'أنواع الغرف والأسعار',
+    addRoomTypeBtn: '+ إضافة نوع غرفة',
+    removeRoomTypeBtn: 'حذف',
+    roomTypeNamePlaceholder: 'مثال: غرفة عادية',
+    noRoomTypesYet: 'لسه معملتش أنواع غرف.',
+    colRoomType: 'نوع الغرفة', colOccupancy: 'الإشغال', colRack: 'السعر الأساسي',
+    colForeigners: 'الأجانب', colEgyptians: 'المصريين/المقيمين',
+    colCorporateRate: 'السعر التعاقدي المحلي (شامل الإفطار)',
+    labelLunchEgyptian: 'غداء \u2014 مصريين/مقيمين (جنيه)',
+    labelLunchForeigner: 'غداء \u2014 أجانب (دولار)',
+    labelDinnerEgyptian: 'عشاء \u2014 مصريين/مقيمين (جنيه)',
+    labelDinnerForeigner: 'عشاء \u2014 أجانب (دولار)',
+    labelNotesList: 'ملاحظات (سطر لكل ملاحظة)', notesListPlaceholder: 'اكتب كل ملاحظة في سطر...',
+    labelBenefitsList: 'مميزات الشركة (سطر لكل ميزة)', benefitsListPlaceholder: 'اكتب كل ميزة في سطر...',
+    labelAvailabilityList: 'شروط توفر الغرف (سطر لكل شرط)', availabilityListPlaceholder: 'اكتب كل شرط في سطر...',
+    docAgreementTitle: 'اتفاقية أسعار ذات خدمات خاصة بين فندق ريتاك العريش و{company}',
+    docContractDurationHeading: 'مدة العقد:',
+    docSpecialRateHeading: 'السعر التعاقدي الخاص:',
+    docNotesHeading: 'ملاحظات:',
+    docBenefitsHeadingSuffix: 'مميزات:',
+    docAvailabilityHeading: 'توفر الغرف:',
+    docLunchSupplementLine: 'إضافة الغداء {eg} جنيه للفرد لليلة للمصريين والمقيمين، {for} دولار للفرد لليلة للأجانب.',
+    docDinnerSupplementLine: 'إضافة العشاء {eg} جنيه للفرد لليلة للمصريين والمقيمين، {for} دولار للفرد لليلة للأجانب.',
+    btnEditContract: 'تعديل', btnPrint: 'طباعة',
+    btnDelete: 'حذف', btnClose: 'إغلاق', btnSaveChanges: 'حفظ التغييرات', btnCreateContract: 'إنشاء العقد',
+    saving: 'جارٍ الحفظ...',
+    toastContractUpdated: 'تم تحديث العقد', toastContractCreated: 'تم إنشاء العقد', toastContractDeleted: 'تم حذف العقد',
+    toastCompanyRequired: 'اسم الشركة مطلوب',
+    errorPrefix: 'خطأ: ',
+    modalEditUser: 'تعديل المستخدم', modalNewUser: 'مستخدم جديد',
+    modalEditUserSub: 'تحديث الاسم أو الدور أو الصلاحيات الشخصية.',
+    modalNewUserSub: 'إنشاء حساب دخول لعضو جديد في الفريق.',
+    labelUsernameField: 'اسم المستخدم', labelTempPassword: 'كلمة مرور مؤقتة',
+    tempPasswordPlaceholder: '4 أحرف على الأقل',
+    labelDisplayName: 'الاسم الظاهر', displayNamePlaceholder: 'مثال: سارة أحمد',
+    labelRole: 'الدور', labelStatus: 'الحالة',
+    statusActiveOpt: 'نشط', statusDisabledOpt: 'معطّل',
+    overridesHeading: 'الصلاحيات الشخصية (تتجاوز صلاحيات دور هذا المستخدم)',
+    btnCreateUser: 'إنشاء المستخدم',
+    toastUserUpdated: 'تم تحديث المستخدم', toastUserCreated: 'تم إنشاء المستخدم',
+    toastFillAllFields: 'يرجى ملء جميع الحقول', toastPasswordReset: 'تم إعادة تعيين كلمة المرور',
+    promptNewPassword: 'أدخل كلمة مرور مؤقتة جديدة لهذا المستخدم (4 أحرف على الأقل):',
+    useRoleDefault: 'استخدام إعداد الدور الافتراضي', alwaysAllow: 'سماح دائم', alwaysDeny: 'منع دائم',
+    allowWord: 'سماح', denyWord: 'منع',
+    roleAdmin: 'مدير النظام', roleSales: 'المبيعات', roleReservations: 'الحجوزات', roleAccounts: 'الحسابات',
+    permCanAdd: 'إضافة العقود', permCanEdit: 'تعديل العقود', permCanDelete: 'حذف العقود',
+    permCanManageUsers: 'إدارة المستخدمين والصلاحيات',
+    roleDefaultForRole: 'الافتراضي لهذا الدور',
+    btnSaveRole: 'حفظ',
+    toastRolePermissionsUpdated: 'تم تحديث صلاحيات الدور',
+    statusActive: 'سارية', statusUpcoming: 'قادمة', statusExpired: 'منتهية', statusUnknown: 'غير معروف',
+    fieldCompany: 'الشركة', fieldContractNo: 'رقم العقد', fieldStartDate: 'تاريخ البداية', fieldEndDate: 'تاريخ النهاية',
+    fieldSingle: 'مفردة', fieldDouble: 'مزدوجة', fieldTriple: 'ثلاثية',
+    fieldValidityNote: 'ملاحظة المدة', fieldRoomRates: 'أسعار الغرف',
+    fieldLunchEgyptian: 'غداء (مصريين)', fieldLunchForeigner: 'غداء (أجانب)',
+    fieldDinnerEgyptian: 'عشاء (مصريين)', fieldDinnerForeigner: 'عشاء (أجانب)',
+    fieldNotesList: 'ملاحظات', fieldBenefits: 'مميزات', fieldAvailability: 'شروط التوفر',
+    fieldAttachment: 'ملف العقد',
+    historyContractCreated: 'تم إنشاء العقد', historyContractDeleted: 'تم حذف العقد', historyUpdatedPrefix: 'تم التحديث: ',
+    loginFailed: 'فشل تسجيل الدخول.', loginErrorGeneric: 'حدث خطأ ما. حاول مرة أخرى.',
+    pleaseLoginAgain: 'يرجى تسجيل الدخول مرة أخرى.', pleaseEnterCreds: 'يرجى إدخال اسم المستخدم وكلمة المرور',
+    noContractNumber: 'بدون رقم عقد', dashSep: ' · ',
+    languageSelf: 'العربية',
+    loginWelcome: 'مرحبًا بك في',
+    loginBrandDescription: 'حلول ذكية لإدارة القروض<br>والأصول',
+    featureSecure: 'آمن', featureSecureSub: 'بياناتك محمية<br>بشكل دائم',
+    featureReliable: 'موثوق', featureReliableSub: 'بيانات دقيقة،<br>تقارير لحظية',
+    featureEasy: 'سهل الاستخدام', featureEasySub: 'واجهة بسيطة،<br>تجربة أفضل',
+    orContinue: 'أو تابع باستخدام', googleSignIn: 'تسجيل الدخول باستخدام Google', passwordPlaceholder: 'أدخل كلمة المرور',
+    attachmentHeading: 'ملف العقد (PDF)',
+    attachmentHint: 'الملفات المدعومة PDF فقط (حد أقصى 15 ميجا).',
+    btnRemoveFile: 'حذف الملف',
+    viewAttachedFile: 'عرض ملف العقد',
+    toastPdfOnly: 'مسموح برفع ملفات PDF فقط',
+    toastFileTooBig: 'حجم الملف كبير جدًا (الحد الأقصى 15 ميجا)',
+    toastAttachmentRemoved: 'تم حذف الملف',
+    toastUploadingFile: 'جارٍ رفع الملف...',
+    fieldAttachmentChange: 'المرفق'
+  }
+};
+
+let currentLang = 'en';
+function t(key){ const d = I18N[currentLang] || I18N.ar; return d[key] !== undefined ? d[key] : key; }
+
+function loadLang(){ try{ return sessionStorage.getItem('retac_lang'); }catch(e){ return null; } }
+function saveLangPref(l){ try{ sessionStorage.setItem('retac_lang', l); }catch(e){} }
+
+function roleLabel(role){
+  const map = { admin:'roleAdmin', sales:'roleSales', reservations:'roleReservations', accounts:'roleAccounts' };
+  return t(map[role] || 'roleAccounts');
+}
+function statusLabel(s){ return t('status' + s) || s; }
+const FIELD_KEY_MAP = {
+  companyName:'fieldCompany', contractNo:'fieldContractNo', startDate:'fieldStartDate', endDate:'fieldEndDate',
+  validityNote:'fieldValidityNote', roomRates:'fieldRoomRates',
+  lunchEgyptian:'fieldLunchEgyptian', lunchForeigner:'fieldLunchForeigner',
+  dinnerEgyptian:'fieldDinnerEgyptian', dinnerForeigner:'fieldDinnerForeigner',
+  notes:'fieldNotesList', benefits:'fieldBenefits', availability:'fieldAvailability',
+  attachment:'fieldAttachmentChange'
+};
+function fieldLabel(key){ return t(FIELD_KEY_MAP[key] || key); }
+
+function occLabel(type){
+  const map = { Single:'fieldSingle', Double:'fieldDouble', Triple:'fieldTriple' };
+  return t(map[type] || type);
+}
+
+function minsAgoText(m){ return currentLang === 'ar' ? `منذ ${m} د` : m + 'm ago'; }
+function hoursAgoText(h){ return currentLang === 'ar' ? `منذ ${h} س` : h + 'h ago'; }
+function daysAgoText(d){ return currentLang === 'ar' ? `منذ ${d} يوم` : d + 'd ago'; }
+function justNowText(){ return currentLang === 'ar' ? 'الآن' : 'just now'; }
+function contractCountText(n){ return currentLang === 'ar' ? `${n} ${n===1?'عقد':'عقود'}` : `${n} contract${n===1?'':'s'}`; }
+function userCountText(n){ return currentLang === 'ar' ? `${n} ${n===1?'مستخدم':'مستخدمين'}` : `${n} user${n===1?'':'s'}`; }
+function arraySummary(arr){
+  if(!arr || arr.length===0) return currentLang === 'ar' ? '(فارغ)' : '(empty)';
+  return currentLang === 'ar' ? `${arr.length} عنصر` : `${arr.length} item${arr.length===1?'':'s'}`;
+}
+function confirmDeleteText(name){ return currentLang === 'ar' ? `هل تريد حذف العقد الخاص بـ "${name}"؟` : `Delete the contract with "${name}"?`; }
+
+/* =====================================================================
+   Loader "still alive" messages — shown under the spinner while the app
+   waits on Google Apps Script / Sheets (which can take a couple of
+   seconds). Purely cosmetic; rotates every ~1.6s so the loading screen
+   never looks frozen.
+   ===================================================================== */
+const LOADER_MESSAGES_EN = [
+  'Waking up the hamsters...',
+  'Counting the contracts...',
+  'Dusting off the spreadsheets...',
+  'Convincing Google Sheets to hurry up...',
+  'Almost there, promise...'
+];
+const LOADER_MESSAGES_AR = [
+  'بنصحّي الحماميص اللي بتشغّل السيستم...',
+  'بنعدّ العقود واحد واحد...',
+  'بننفض التراب عن الشيتات...',
+  'بنرشي جوجل شيتس عشان يستعجل...',
+  'خلصنا خلصنا، ثانية واحدة...'
+];
+let loaderMsgInterval = null;
+function startLoaderMessages(){
+  const msgs = currentLang === 'ar' ? LOADER_MESSAGES_AR : LOADER_MESSAGES_EN;
+  let i = 0;
+  const msgEl = el('loaderMsg');
+  if(!msgEl) return;
+  msgEl.textContent = msgs[0];
+  if(loaderMsgInterval) clearInterval(loaderMsgInterval);
+  loaderMsgInterval = setInterval(()=>{
+    i = (i + 1) % msgs.length;
+    msgEl.textContent = msgs[i];
+  }, 1600);
+}
+function stopLoaderMessages(){
+  if(loaderMsgInterval){ clearInterval(loaderMsgInterval); loaderMsgInterval = null; }
+}
+
+/* =====================================================================
+   App state
+   ===================================================================== */
+let state = { user:null, contracts:[], history:[], seenIds:[], stats:{}, users:[], canManageUsers:false, rolePermissions:[] };
+let currentFilter = 'All';
+let currentUserTab = 'accounts';
+let sessionToken = null;
+let modalRoomRates = []; // working copy of room-rate blocks while the contract modal is in edit mode
+const el = id => document.getElementById(id);
+
+/* ---------- helpers ---------- */
+function fmt(n){ if(n === '' || n === null || n === undefined) return '—'; return Number(n).toLocaleString('en-US'); }
+function fmtDate(iso){
+  if(!iso) return '—';
+  const d = new Date(iso);
+  if(isNaN(d)) return '—';
+  const locale = currentLang === 'ar' ? 'ar-EG-u-nu-latn' : 'en-GB';
+  return d.toLocaleDateString(locale, {day:'2-digit', month:'short', year:'numeric'});
+}
+function timeAgo(iso){
+  if(!iso) return '';
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff/60000);
+  if(mins < 1) return justNowText();
+  if(mins < 60) return minsAgoText(mins);
+  const hrs = Math.floor(mins/60);
+  if(hrs < 24) return hoursAgoText(hrs);
+  return daysAgoText(Math.floor(hrs/24));
+}
+function escapeHtml(s){ const d = document.createElement('div'); d.textContent = s ?? ''; return d.innerHTML; }
+function showToast(msg, isError){
+  const tEl = el('toast');
+  el('toastMessage').textContent = msg;
+  tEl.className = 'toast show' + (isError ? ' error' : '');
+  setTimeout(()=> tEl.className = 'toast hidden', 2400);
+}
+function callServer(fnName, ...args){
+  return new Promise((resolve, reject)=>{
+    google.script.run.withSuccessHandler(resolve).withFailureHandler(reject)[fnName](...args);
+  });
+}
+
+function roleOptions(){
+  return [
+    { value:'admin', label:t('roleAdmin') },
+    { value:'sales', label:t('roleSales') },
+    { value:'reservations', label:t('roleReservations') },
+    { value:'accounts', label:t('roleAccounts') }
+  ];
+}
+function permFields(){
+  return [
+    { key:'canAdd', label:t('permCanAdd') },
+    { key:'canEdit', label:t('permCanEdit') },
+    { key:'canDelete', label:t('permCanDelete') },
+    { key:'canManageUsers', label:t('permCanManageUsers') }
+  ];
+}
+
+/* ---------- session storage ---------- */
+function saveToken(tok){ sessionToken = tok; try{ sessionStorage.setItem('retac_token', tok); }catch(e){} }
+function loadToken(){ try{ return sessionStorage.getItem('retac_token'); }catch(e){ return null; } }
+function clearToken(){ sessionToken = null; try{ sessionStorage.removeItem('retac_token'); }catch(e){} }
+
+/* =====================================================================
+   Language switching
+   ===================================================================== */
+function applyStaticTranslations(){
+  document.documentElement.lang = currentLang;
+  document.documentElement.dir = currentLang === 'ar' ? 'rtl' : 'ltr';
+  el('langToggleLabel').textContent = currentLang === 'ar' ? 'English' : 'العربية';
+  document.querySelectorAll('[data-i18n]').forEach(node=>{
+    const value = t(node.getAttribute('data-i18n'));
+    if(typeof value === 'string' && value.includes('<br>')) node.innerHTML = value;
+    else node.textContent = value;
+  });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(node=>{
+    node.setAttribute('placeholder', t(node.getAttribute('data-i18n-placeholder')));
+  });
+}
+
+function applyLanguage(){
+  applyStaticTranslations();
+  if(state.user){
+    renderAll();
+    const activePage = document.querySelector('.nav-item[data-page].active');
+    goToPage(activePage ? activePage.dataset.page : 'dashboard');
+    setUserTab(currentUserTab);
+  }
+}
+
+function toggleLanguage(){
+  currentLang = currentLang === 'ar' ? 'en' : 'ar';
+  saveLangPref(currentLang);
+  applyLanguage();
+}
+
+/* ---------- login flow ---------- */
+function showLogin(message){
+  stopLoaderMessages();
+  el('appLoader').classList.add('hidden');
+  el('app').classList.add('hidden');
+  el('loginScreen').classList.remove('hidden');
+  if(message){
+    el('loginError').textContent = message;
+    el('loginError').classList.remove('hidden');
+  } else {
+    el('loginError').classList.add('hidden');
+  }
+  el('loginUsername').focus();
+}
+
+async function attemptLogin(){
+  const username = el('loginUsername').value.trim();
+  const password = el('loginPassword').value;
+  try{
+    if(el('rememberMeChk') && el('rememberMeChk').checked) localStorage.setItem('retac_remembered_username', username);
+    else localStorage.removeItem('retac_remembered_username');
+  }catch(e){}
+  if(!username || !password){ showToast(t('pleaseEnterCreds'), true); return; }
+  const btn = el('loginBtn');
+  btn.disabled = true;
+  const btnLabel = btn.querySelector('span');
+  if(btnLabel) btnLabel.textContent = t('signingIn'); else btn.textContent = t('signingIn');
+  try{
+    const res = await callServer('login', username, password);
+    if(!res.ok){
+      showLogin(res.error || t('loginFailed'));
+      return;
+    }
+    saveToken(res.token);
+    el('loginScreen').classList.add('hidden');
+    el('appLoader').classList.remove('hidden');
+    startLoaderMessages();
+    await bootApp();
+  }catch(err){
+    showLogin(t('loginErrorGeneric'));
+  }finally{
+    btn.disabled = false;
+    if(btnLabel) btnLabel.textContent = t('signIn'); else btn.textContent = t('signIn');
+  }
+}
+
+async function doLogout(){
+  try{ await callServer('logout', sessionToken); }catch(e){}
+  clearToken();
+  el('app').classList.add('hidden');
+  el('loginPassword').value = '';
+  showLogin();
+}
+
+/* ---------- navigation ---------- */
+function goToPage(page){
+  document.querySelectorAll('.nav-item[data-page]').forEach(b=> b.classList.toggle('active', b.dataset.page === page));
+  document.querySelectorAll('.page').forEach(p=> p.classList.remove('active-page'));
+  el(page + 'Page').classList.add('active-page');
+  const titles = {
+    dashboard:[t('pageDashboardTitle'), t('pageDashboardDesc')],
+    contracts:[t('pageContractsTitle'), t('pageContractsDesc')],
+    notifications:[t('pageNotificationsTitle'), t('pageNotificationsDesc')],
+    history:[t('pageHistoryTitle'), t('pageHistoryDesc')],
+    users:[t('pageUsersTitle'), t('pageUsersDesc')]
+  };
+  el('pageTitle').textContent = titles[page][0];
+  el('pageDescription').textContent = titles[page][1];
+}
+
+/* ---------- rendering: shell ---------- */
+function renderUser(){
+  if(!state || !state.user){ console.warn('state was null in renderUser'); return; }
+  el('userName').textContent = state.user.displayName || state.user.username;
+  el('userRole').textContent = roleLabel(state.user.role);
+  el('userAvatar').textContent = (state.user.displayName || state.user.username || 'U').charAt(0).toUpperCase();
+  el('addContractBtn').style.display = state.user.permissions.canAdd ? 'inline-block' : 'none';
+  el('usersNavItem').classList.toggle('hidden', !state.canManageUsers);
+}
+
+function renderKpis(){
+  el('totalContracts').textContent = state.stats.total || 0;
+  el('activeContracts').textContent = state.stats.active || 0;
+  el('upcomingContracts').textContent = state.stats.upcoming || 0;
+  el('expiredContracts').textContent = state.stats.expired || 0;
+  el('statusActive').textContent = state.stats.active || 0;
+  el('statusUpcoming').textContent = state.stats.upcoming || 0;
+  el('statusExpired').textContent = state.stats.expired || 0;
+}
+
+function unreadCount(){ return state.history.filter(h => !state.seenIds.includes(h.id)).length; }
+function renderNotifBadges(){
+  const n = unreadCount();
+  [el('notificationBadge'), el('topNotificationBadge')].forEach(b=>{
+    b.textContent = n;
+    b.classList.toggle('hidden', n === 0);
+  });
+}
+
+/* ---------- contract row (dashboard search + contracts list) ---------- */
+function roomTypeChips(c){
+  const types = (c.roomRates || []).map(r => r.roomType).filter(Boolean);
+  if(types.length === 0) return '';
+  return `<div class="rate-strip">${types.map(rt => `<span class="rate-chip">${escapeHtml(rt)}</span>`).join('')}</div>`;
+}
+
+function contractRow(c){
+  return `<div class="contract-row" data-open="${c.id}">
+    <div class="contract-row-top">
+      <div>
+        <div class="contract-company">${escapeHtml(c.companyName)}${c.attachmentUrl ? ' 📎' : ''}</div>
+        <div class="contract-sub">${escapeHtml(c.contractNo || t('noContractNumber'))}${t('dashSep')}${fmtDate(c.startDate)} → ${fmtDate(c.endDate)}</div>
+      </div>
+      <span class="status-pill ${c.status}">${statusLabel(c.status)}</span>
+    </div>
+    ${roomTypeChips(c)}
+  </div>`;
+}
+
+/* ---------- dashboard: search ---------- */
+function renderSearch(){
+  const q = el('contractSearch').value.trim().toLowerCase();
+  const results = el('searchResults');
+  const empty = el('searchEmpty');
+  const clearBtn = el('clearSearch');
+  clearBtn.classList.toggle('hidden', q === '');
+  if(q === ''){ results.classList.add('hidden'); empty.classList.add('hidden'); return; }
+
+  const matches = state.contracts.filter(c => (c.companyName||'').toLowerCase().includes(q));
+  if(matches.length === 0){
+    results.classList.add('hidden'); empty.classList.remove('hidden'); return;
+  }
+  empty.classList.add('hidden'); results.classList.remove('hidden');
+  results.innerHTML = matches.map(contractRow).join('');
+  bindRowOpen(results);
+}
+
+/* ---------- dashboard: recent activity ---------- */
+function renderRecentActivity(){
+  const wrap = el('recentActivity');
+  const recent = state.history.slice(0, 6);
+  if(recent.length === 0){ wrap.innerHTML = `<div class="activity-loading">${t('noActivityYet')}</div>`; return; }
+  wrap.innerHTML = recent.map(h => `
+    <div class="activity-item ${!state.seenIds.includes(h.id) ? 'unread' : ''}">
+      <div>
+        <div class="who">${escapeHtml(h.user)} — ${escapeHtml(h.companyName)}</div>
+        <div class="what">${describeHistory(h)}</div>
+      </div>
+      <div class="when">${timeAgo(h.timestamp)}</div>
+    </div>`).join('');
+}
+
+function describeHistory(h){
+  if(h.type === 'created') return t('historyContractCreated');
+  if(h.type === 'deleted') return t('historyContractDeleted');
+  const fields = Object.keys(h.changes || {}).map(f => fieldLabel(f));
+  return t('historyUpdatedPrefix') + fields.join(', ');
+}
+
+/* ---------- contracts page ---------- */
+function renderContractsPage(){
+  let list = state.contracts.slice().sort((a,b)=> new Date(b.updatedAt||b.createdAt) - new Date(a.updatedAt||a.createdAt));
+  if(currentFilter !== 'All') list = list.filter(c => c.status === currentFilter);
+  el('contractsListCount').textContent = contractCountText(list.length);
+  const container = el('contractsListContainer');
+  if(list.length === 0){
+    container.innerHTML = `<div class="search-empty"><div class="empty-icon">—</div><div class="empty-title">${t('noContracts')}</div><div class="empty-text">${t('tryDifferentFilter')}</div></div>`;
+    return;
+  }
+  container.innerHTML = list.map(contractRow).join('');
+  bindRowOpen(container);
+}
+
+function bindRowOpen(container){
+  container.querySelectorAll('[data-open]').forEach(row=>{
+    row.onclick = ()=> openContractModal(row.dataset.open);
+  });
+}
+
+/* ---------- notifications / history pages ---------- */
+function fbNotifIcon(type){
+  if(type === 'created') return { cls:'type-created', icon:'➕' };
+  if(type === 'deleted') return { cls:'type-deleted', icon:'🗑' };
+  return { cls:'type-updated', icon:'✎' };
+}
+function fbNotifText(h){
+  if(h.type === 'created') return `<b>${escapeHtml(h.companyName)}</b> ${t('historyContractCreated')}`;
+  if(h.type === 'deleted') return `<b>${escapeHtml(h.companyName)}</b> ${t('historyContractDeleted')}`;
+  const fields = Object.keys(h.changes || {}).map(f => fieldLabel(f));
+  return `<b>${escapeHtml(h.companyName)}</b> ${t('historyUpdatedPrefix')}${fields.join(', ')}`;
+}
+function fbNotifItemHtml(h){
+  const unread = !state.seenIds.includes(h.id);
+  const icon = fbNotifIcon(h.type);
+  return `<div class="fb-notif-item ${unread ? 'unread' : ''}" data-mark="${h.id}" data-contract="${h.contractId||''}">
+    <div class="fb-notif-icon ${icon.cls}">${icon.icon}</div>
+    <div class="fb-notif-body">
+      <div class="fb-notif-text">${escapeHtml(h.user)} — ${fbNotifText(h)}</div>
+      <div class="fb-notif-time">${timeAgo(h.timestamp)}</div>
+    </div>
+    ${unread ? '<span class="fb-notif-dot"></span>' : ''}
+  </div>`;
+}
+function renderNotificationsPage(){
+  const wrap = el('notificationsList');
+  if(state.history.length === 0){ wrap.innerHTML = `<div class="activity-loading">${t('noNotificationsYet')}</div>`; return; }
+  wrap.innerHTML = state.history.slice(0, 40).map(fbNotifItemHtml).join('');
+  bindHistoryClicks(wrap);
+}
+function renderHistoryPage(){
+  const wrap = el('fullHistoryList');
+  if(state.history.length === 0){ wrap.innerHTML = `<div class="activity-loading">${t('noHistoryYet')}</div>`; return; }
+  wrap.innerHTML = state.history.map(historyItemHtml).join('');
+  bindHistoryClicks(wrap);
+}
+function historyValueDisplay(v){
+  return Array.isArray(v) ? arraySummary(v) : escapeHtml(String(v ?? '—'));
+}
+function historyItemHtml(h){
+  const unread = !state.seenIds.includes(h.id);
+  const changesHtml = h.type === 'created' ? `<span class="chg">${t('historyContractCreated')}</span>`
+    : h.type === 'deleted' ? `<span class="chg">${t('historyContractDeleted')}</span>`
+    : Object.entries(h.changes||{}).map(([f,v]) =>
+        `<span class="chg"><b>${fieldLabel(f)}:</b> <span class="old">${historyValueDisplay(v.old)}</span> → <span class="new">${historyValueDisplay(v.new)}</span></span>`
+      ).join('');
+  return `<div class="history-item" data-mark="${h.id}" data-contract="${h.contractId||''}" style="${unread ? 'border-color:var(--gold);' : ''}">
+    <div class="history-top"><span>${escapeHtml(h.user)}</span><span>${timeAgo(h.timestamp)}</span></div>
+    <div class="history-company">${escapeHtml(h.companyName)}</div>
+    ${changesHtml}
+  </div>`;
+}
+async function markAllNotificationsRead(){
+  const unread = state.history.filter(h => !state.seenIds.includes(h.id));
+  if(unread.length === 0) return;
+  for(const h of unread){
+    try{ state.seenIds = await callServer('markNotificationSeen', sessionToken, h.id); }catch(e){}
+  }
+  renderNotifBadges();
+  renderNotificationsPage();
+  renderHistoryPage();
+}
+// Marks the clicked notification/history entry as seen, then opens the
+// related contract (if it still exists — a deleted contract obviously
+// can't be reopened, so that click just marks it read and stops there).
+function bindHistoryClicks(wrap){
+  wrap.querySelectorAll('[data-mark]').forEach(item=>{
+    item.onclick = async ()=>{
+      const id = item.dataset.mark;
+      if(!state.seenIds.includes(id)){
+        try{ state.seenIds = await callServer('markNotificationSeen', sessionToken, id); renderNotifBadges(); item.style.borderColor = ''; }catch(e){}
+      }
+      const contractId = item.dataset.contract;
+      if(contractId && state.contracts.some(c => c.id === contractId)){
+        openContractModal(contractId);
+      }
+    };
+  });
+}
+
+/* ---------- contract document view (the formal agreement look) ---------- */
+function roomRatesTableHtml(roomRates){
+  if(!roomRates || roomRates.length === 0){
+    return `<div class="perm-hint">${t('noRoomTypesYet')}</div>`;
+  }
+  const rows = [];
+  roomRates.forEach(block=>{
+    const occ = block.occupancy || [];
+    occ.forEach((o, i)=>{
+      rows.push(`<tr>
+        ${i===0 ? `<td rowspan="${occ.length}"><b>${escapeHtml(block.roomType||'')}</b></td>` : ''}
+        <td>${occLabel(o.type)}</td>
+        <td>${fmt(o.rack)}</td>
+        <td>${fmt(o.foreigner)}</td>
+        <td>${fmt(o.egyptian)}</td>
+      </tr>`);
+    });
+  });
+  return `<table class="doc-rate-table">
+    <thead>
+      <tr>
+        <th rowspan="2">${t('colRoomType')}</th>
+        <th rowspan="2"></th>
+        <th rowspan="2">${t('colRack')}</th>
+        <th colspan="2">${t('colCorporateRate')}</th>
+      </tr>
+      <tr><th>${t('colForeigners')}</th><th>${t('colEgyptians')}</th></tr>
+    </thead>
+    <tbody>${rows.join('')}</tbody>
+  </table>`;
+}
+
+function contractDocHtml(c){
+  const validity = (c.validityNote && c.validityNote.trim()) ? c.validityNote : `${fmtDate(c.startDate)} → ${fmtDate(c.endDate)}`;
+  const supplementLines = [];
+  if(c.lunchEgyptian || c.lunchForeigner){
+    supplementLines.push(t('docLunchSupplementLine').replace('{eg}', fmt(c.lunchEgyptian)).replace('{for}', fmt(c.lunchForeigner)));
+  }
+  if(c.dinnerEgyptian || c.dinnerForeigner){
+    supplementLines.push(t('docDinnerSupplementLine').replace('{eg}', fmt(c.dinnerEgyptian)).replace('{for}', fmt(c.dinnerForeigner)));
+  }
+  const allNotes = supplementLines.concat(c.notes || []);
+  const benefits = c.benefits || [];
+  const availability = c.availability || [];
+
+  return `
+  <div class="contract-doc">
+    <div class="doc-header">
+      <div class="doc-brand">RETAC EL-ARISH</div>
+      <div class="doc-brand-sub">EL ARISH RESORT</div>
+    </div>
+    <div class="doc-title">${t('docAgreementTitle').replace('{company}', escapeHtml(c.companyName))}</div>
+
+    ${c.attachmentUrl ? `
+    <div class="doc-section" style="text-align:center;">
+      <a href="${c.attachmentUrl}" target="_blank" rel="noopener" class="btn btn-ghost" style="display:inline-flex; align-items:center; gap:8px; text-decoration:none;">
+        📎 ${escapeHtml(c.attachmentFileName || t('viewAttachedFile'))}
+      </a>
+    </div>` : ''}
+
+    <div class="doc-section">
+      <div class="doc-section-title">➤ ${t('docContractDurationHeading')}</div>
+      <ul class="doc-list"><li>${escapeHtml(validity)}</li></ul>
+    </div>
+
+    <div class="doc-section">
+      <div class="doc-section-title">➤ ${t('docSpecialRateHeading')}</div>
+      ${roomRatesTableHtml(c.roomRates)}
+    </div>
+
+    ${allNotes.length ? `
+    <div class="doc-section">
+      <div class="doc-section-title doc-underline">${t('docNotesHeading')}</div>
+      <ul class="doc-list">${allNotes.map(n=>`<li>${escapeHtml(n)}</li>`).join('')}</ul>
+    </div>` : ''}
+
+    ${benefits.length ? `
+    <div class="doc-section">
+      <div class="doc-section-title">➤ ${escapeHtml(c.companyName)} ${t('docBenefitsHeadingSuffix')}</div>
+      <ul class="doc-list">${benefits.map(n=>`<li>${escapeHtml(n)}</li>`).join('')}</ul>
+    </div>` : ''}
+
+    ${availability.length ? `
+    <div class="doc-section">
+      <div class="doc-section-title doc-underline">${t('docAvailabilityHeading')}</div>
+      <ul class="doc-list">${availability.map(n=>`<li>${escapeHtml(n)}</li>`).join('')}</ul>
+    </div>` : ''}
+  </div>`;
+}
+
+function renderContractDocumentView(c){
+  if(!state || !state.user){ console.warn('state was null — recovering'); bootApp(); return; }
+  const perms = state.user.permissions;
+  el('contractModalContent').innerHTML = `
+    ${contractDocHtml(c)}
+    <div class="modal-actions">
+      ${perms.canDelete ? `<button class="btn btn-danger" id="deleteBtn">${t('btnDelete')}</button>` : ''}
+      <button class="btn btn-ghost" id="printContractBtn">${t('btnPrint')}</button>
+      <button class="btn btn-ghost" id="cancelModalBtn">${t('btnClose')}</button>
+      ${perms.canEdit ? `<button class="btn btn-primary" id="editContractBtn">${t('btnEditContract')}</button>` : ''}
+    </div>
+  `;
+  el('cancelModalBtn').onclick = closeModal;
+  el('printContractBtn').onclick = ()=> window.print();
+  if(perms.canDelete) el('deleteBtn').onclick = ()=> deleteContractRow(c.id);
+  if(perms.canEdit) el('editContractBtn').onclick = ()=> renderContractEditForm(c);
+}
+
+/* ---------- room rate editor (used inside the edit form) ---------- */
+function emptyRoomTypeBlock(){
+  return {
+    roomType: 'Standard Room',
+    occupancy: [
+      { type:'Single', rack:0, foreigner:0, egyptian:0 },
+      { type:'Double', rack:0, foreigner:0, egyptian:0 },
+      { type:'Triple', rack:0, foreigner:0, egyptian:0 }
+    ]
+  };
+}
+
+function roomTypeBlockHtml(block, idx){
+  const rows = block.occupancy.map((occ, occIdx) => `
+    <tr>
+      <td>${occLabel(occ.type)}</td>
+      <td><input type="number" value="${occ.rack}" oninput="updateRoomRateValue(${idx},${occIdx},'rack',this.value)"></td>
+      <td><input type="number" value="${occ.foreigner}" oninput="updateRoomRateValue(${idx},${occIdx},'foreigner',this.value)"></td>
+      <td><input type="number" value="${occ.egyptian}" oninput="updateRoomRateValue(${idx},${occIdx},'egyptian',this.value)"></td>
+    </tr>`).join('');
+  return `
+    <div class="room-type-block">
+      <div class="room-type-block-head">
+        <div class="room-type-name-fixed">${escapeHtml(block.roomType)}</div>
+      </div>
+      <table class="room-rate-table">
+        <thead><tr><th>${t('colOccupancy')}</th><th>${t('colRack')}</th><th>${t('colForeigners')}</th><th>${t('colEgyptians')}</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+}
+
+function renderRoomRatesEditor(){
+  const wrap = el('roomRatesEditor');
+  if(!wrap) return;
+  wrap.innerHTML = modalRoomRates.map((block, idx) => roomTypeBlockHtml(block, idx)).join('');
+}
+
+function addRoomTypeBlock(){
+  modalRoomRates.push(emptyRoomTypeBlock());
+  renderRoomRatesEditor();
+}
+function removeRoomTypeBlock(idx){
+  modalRoomRates.splice(idx, 1);
+  renderRoomRatesEditor();
+}
+function updateRoomTypeName(idx, val){
+  if(modalRoomRates[idx]) modalRoomRates[idx].roomType = val;
+}
+function updateRoomRateValue(idx, occIdx, field, val){
+  if(modalRoomRates[idx] && modalRoomRates[idx].occupancy[occIdx]){
+    modalRoomRates[idx].occupancy[occIdx][field] = Number(val) || 0;
+  }
+}
+
+/* ---------- contract file attachment (PDF) ---------- */
+function fileToBase64(file){
+  return new Promise((resolve, reject)=>{
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result.split(',')[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+// Uploads (or replaces) the PDF attached to a contract. Called right
+// after a contract is created/updated, using whichever file the user
+// picked in the "f_attachment" file input, if any.
+//
+// The server now returns just the single updated contract (not the full
+// bootstrap), so this only patches that one contract inside
+// state.contracts instead of replacing the whole app state — much less
+// data moved over the wire, and it's safe to run in the background
+// without blocking the UI.
+async function uploadAttachmentFile(contractId, file){
+  if(file.type !== 'application/pdf'){ showToast(t('toastPdfOnly'), true); return; }
+  if(file.size > 15 * 1024 * 1024){ showToast(t('toastFileTooBig'), true); return; }
+  const base64 = await fileToBase64(file);
+  const updatedContract = await callServer('uploadContractFile', sessionToken, contractId, base64, file.name, file.type);
+  if(updatedContract){
+    const idx = state.contracts.findIndex(c => c.id === updatedContract.id);
+    if(idx !== -1) state.contracts[idx] = updatedContract;
+    else state.contracts.push(updatedContract);
+    renderAll();
+  }
+}
+
+async function removeAttachment(contractId){
+  try{
+    state = await callServer('removeContractAttachment', sessionToken, contractId);
+    closeModal();
+    renderAll();
+    showToast(t('toastAttachmentRemoved'));
+  }catch(err){
+    showToast(t('errorPrefix') + (err && err.message ? err.message : err), true);
+  }
+}
+
+/* ---------- contract edit form (create / edit) ---------- */
+function renderContractEditForm(c){
+  if(!state || !state.user){ console.warn('state was null — recovering'); bootApp(); return; }
+  modalRoomRates = (c && Array.isArray(c.roomRates) && c.roomRates.length)
+    ? JSON.parse(JSON.stringify(c.roomRates))
+    : [emptyRoomTypeBlock()];
+  const perms = state.user.permissions;
+
+  el('contractModalContent').innerHTML = `
+    <div class="modal-title">${c ? escapeHtml(c.companyName) : t('modalNewContract')}</div>
+    <div class="modal-sub">${t('modalNote')}</div>
+
+    <div class="field"><label>${t('labelCompanyName')}</label><input id="f_company" value="${c?escapeHtml(c.companyName):''}" placeholder="${t('companyPlaceholder')}"></div>
+    <div class="field-grid">
+      <div class="field"><label>${t('labelStartDate')}</label><input id="f_start" type="date" value="${c && c.startDate ? c.startDate.slice(0,10) : ''}"></div>
+      <div class="field"><label>${t('labelEndDate')}</label><input id="f_end" type="date" value="${c && c.endDate ? c.endDate.slice(0,10) : ''}"></div>
+    </div>
+    <div class="field"><label>${t('labelValidityNote')}</label><input id="f_validity" value="${c?escapeHtml(c.validityNote||''):''}" placeholder="${t('validityNotePlaceholder')}"></div>
+
+    <div class="overrides-heading">${t('roomTypesHeading')}</div>
+    <div id="roomRatesEditor"></div>
+
+    <div class="field-grid">
+      <div class="field"><label>${t('labelLunchEgyptian')}</label><input id="f_lunchEg" type="number" value="${c?c.lunchEgyptian:0}"></div>
+      <div class="field"><label>${t('labelLunchForeigner')}</label><input id="f_lunchFor" type="number" value="${c?c.lunchForeigner:0}"></div>
+      <div class="field"><label>${t('labelDinnerEgyptian')}</label><input id="f_dinnerEg" type="number" value="${c?c.dinnerEgyptian:0}"></div>
+      <div class="field"><label>${t('labelDinnerForeigner')}</label><input id="f_dinnerFor" type="number" value="${c?c.dinnerForeigner:0}"></div>
+    </div>
+
+    <div class="field"><label>${t('labelNotesList')}</label><textarea id="f_notes" placeholder="${t('notesListPlaceholder')}">${c && c.notes ? escapeHtml(c.notes.join('\n')) : ''}</textarea></div>
+
+    <div class="overrides-heading">${t('attachmentHeading')}</div>
+    <div class="field">
+      ${c && c.attachmentUrl ? `
+        <div class="perm-hint" style="margin-bottom:8px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+          📎 <a href="${c.attachmentUrl}" target="_blank" rel="noopener" style="color:var(--gold);">${escapeHtml(c.attachmentFileName || '')}</a>
+          <button type="button" class="icon-btn" id="removeAttachmentBtn">${t('btnRemoveFile')}</button>
+        </div>` : ''}
+      <input type="file" id="f_attachment" accept="application/pdf">
+      <div class="perm-hint">${t('attachmentHint')}</div>
+    </div>
+
+    <div class="modal-actions">
+      ${c && perms.canDelete ? `<button class="btn btn-danger" id="deleteBtn">${t('btnDelete')}</button>` : ''}
+      <button class="btn btn-ghost" id="cancelModalBtn">${t('btnClose')}</button>
+      <button class="btn btn-primary" id="saveModalBtn">${c ? t('btnSaveChanges') : t('btnCreateContract')}</button>
+    </div>
+  `;
+  renderRoomRatesEditor();
+  el('cancelModalBtn').onclick = closeModal;
+  el('saveModalBtn').onclick = ()=> saveContract(c ? c.id : null);
+  if(c && perms.canDelete) el('deleteBtn').onclick = ()=> deleteContractRow(c.id);
+  if(c && c.attachmentUrl){
+    const removeBtn = el('removeAttachmentBtn');
+    if(removeBtn) removeBtn.onclick = ()=> removeAttachment(c.id);
+  }
+}
+
+function openContractModal(id){
+  const c = id ? state.contracts.find(x=>x.id===id) : null;
+  if(c) renderContractDocumentView(c);
+  else renderContractEditForm(null);
+  el('contractModal').classList.remove('hidden');
+}
+function closeModal(){ el('contractModal').classList.add('hidden'); }
+el('closeModal').onclick = closeModal;
+el('contractModal').querySelector('.modal-overlay').onclick = closeModal;
+
+function splitLines_(s){ return String(s||'').split('\n').map(x=>x.trim()).filter(Boolean); }
+
+// Saves the contract's own fields (everything except the PDF) and, as
+// soon as that succeeds, closes the modal and refreshes the UI right
+// away — the user doesn't have to wait on the file upload at all. If a
+// PDF was picked, it's uploaded afterwards in the background (not
+// awaited here); any upload error surfaces later as a toast instead of
+// blocking the save.
+async function saveContract(id){
+  const g = i => document.getElementById(i).value;
+  const company = g('f_company').trim();
+  if(!company){ showToast(t('toastCompanyRequired'), true); return; }
+  const existing = id ? state.contracts.find(x => x.id === id) : null;
+  const payload = {
+    companyName: company,
+    contractNo: existing ? existing.contractNo : '',
+    startDate: g('f_start'),
+    endDate: g('f_end'),
+    validityNote: g('f_validity').trim(),
+    roomRates: modalRoomRates.filter(b => b.roomType && b.roomType.trim()),
+    lunchEgyptian: g('f_lunchEg'), lunchForeigner: g('f_lunchFor'),
+    dinnerEgyptian: g('f_dinnerEg'), dinnerForeigner: g('f_dinnerFor'),
+    notes: splitLines_(g('f_notes')),
+    benefits: existing ? existing.benefits : [],
+    availability: existing ? existing.availability : []
+  };
+  const btn = el('saveModalBtn');
+  btn.disabled = true; btn.textContent = t('saving');
+  try{
+    const result = id
+      ? await callServer('updateContract', sessionToken, id, payload)
+      : await callServer('addContract', sessionToken, payload);
+
+    const savedId = id || result.newId;
+    state = result;
+
+    // close + refresh immediately — don't make the user wait for the PDF
+    closeModal();
+    renderAll();
+    showToast(id ? t('toastContractUpdated') : t('toastContractCreated'));
+
+    const fileInput = el('f_attachment');
+    if(fileInput && fileInput.files && fileInput.files[0]){
+      const file = fileInput.files[0];
+      // fire-and-forget: uploads in the background, doesn't block the UI
+      uploadAttachmentFile(savedId, file).catch(err=>{
+        showToast(t('errorPrefix') + (err && err.message ? err.message : err), true);
+      });
+    }
+  }catch(err){
+    showToast(t('errorPrefix') + (err && err.message ? err.message : err), true);
+    btn.disabled = false; btn.textContent = id ? t('btnSaveChanges') : t('btnCreateContract');
+  }
+}
+
+async function deleteContractRow(id){
+  const c = state.contracts.find(x=>x.id===id);
+  if(!c || !confirm(confirmDeleteText(c.companyName))) return;
+  try{
+    state = await callServer('deleteContract', sessionToken, id);
+    closeModal();
+    renderAll();
+    showToast(t('toastContractDeleted'));
+  }catch(err){
+    showToast(t('errorPrefix') + (err && err.message ? err.message : err), true);
+  }
+}
+
+/* ---------- users page: tabs ---------- */
+function setUserTab(tab){
+  currentUserTab = tab;
+  document.querySelectorAll('[data-usertab]').forEach(tb=> tb.classList.toggle('active', tb.dataset.usertab === tab));
+  el('usersListContainer').classList.toggle('hidden', tab !== 'accounts');
+  el('rolesListContainer').classList.toggle('hidden', tab !== 'roles');
+  el('addUserBtn').classList.toggle('hidden', tab !== 'accounts');
+  el('usersSectionTitle').textContent = tab === 'accounts' ? t('allUsersTitle') : t('rolesPermissionsTitle');
+  if(tab === 'accounts') renderUsersPage(); else renderRolesPage();
+}
+
+/* ---------- users page: accounts ---------- */
+function userRow(u){
+  return `<div class="user-row">
+    <div class="user-row-left">
+      <div class="user-row-name">${escapeHtml(u.displayName)} <span style="color:var(--secondary); font-weight:400;">@${escapeHtml(u.username)}</span></div>
+      <div class="user-row-sub">${fmtDate(u.createdAt)}</div>
+    </div>
+    <div class="user-row-right">
+      <span class="role-pill">${roleLabel(u.role)}</span>
+      ${u.hasCustomPermissions ? `<span class="custom-pill">${currentLang==='ar' ? 'صلاحيات مخصّصة' : 'Custom permissions'}</span>` : ''}
+      <span class="status-pill ${u.active ? 'on' : 'off'}">${u.active ? t('statusActiveOpt') : t('statusDisabledOpt')}</span>
+      <button class="icon-btn" data-edit="${u.id}">${currentLang==='ar' ? 'تعديل' : 'Edit'}</button>
+      <button class="icon-btn" data-reset="${u.id}">${currentLang==='ar' ? 'إعادة تعيين كلمة المرور' : 'Reset Password'}</button>
+    </div>
+  </div>`;
+}
+
+function renderUsersPage(){
+  if(!state.canManageUsers || currentUserTab !== 'accounts') return;
+  el('usersListCount').textContent = userCountText(state.users.length);
+  const container = el('usersListContainer');
+  if(state.users.length === 0){
+    container.innerHTML = `<div class="search-empty"><div class="empty-title">${t('noUsersYet')}</div></div>`;
+    return;
+  }
+  container.innerHTML = state.users.map(userRow).join('');
+  container.querySelectorAll('[data-edit]').forEach(btn=>{
+    btn.onclick = ()=> openUserModal(state.users.find(u=>u.id===btn.dataset.edit));
+  });
+  container.querySelectorAll('[data-reset]').forEach(btn=>{
+    btn.onclick = ()=> resetUserPassword(btn.dataset.reset);
+  });
+}
+
+/* ---------- users page: roles & permissions matrix ---------- */
+function roleCard(r){
+  const toggles = permFields().map(f => `
+    <label class="perm-toggle">
+      <input type="checkbox" data-role="${r.role}" data-perm="${f.key}" ${r[f.key] ? 'checked' : ''}>
+      ${f.label}
+    </label>`).join('');
+  return `<div class="role-card">
+    <div class="role-card-title">${roleLabel(r.role)} <span style="color:var(--secondary); font-weight:400; font-size:11.5px;">(${t('roleDefaultForRole')})</span></div>
+    <div class="perm-toggle-row">${toggles}</div>
+    <div class="role-card-actions"><button class="btn btn-primary" data-save-role="${r.role}">${t('btnSaveRole')}</button></div>
+  </div>`;
+}
+
+function renderRolesPage(){
+  if(!state.canManageUsers || currentUserTab !== 'roles') return;
+  el('usersListCount').textContent = t('rolesDefaultsNote');
+  const container = el('rolesListContainer');
+  if(state.rolePermissions.length === 0){
+    container.innerHTML = `<div class="search-empty"><div class="empty-title">${t('noRolesFound')}</div></div>`;
+    return;
+  }
+  container.innerHTML = state.rolePermissions.map(roleCard).join('');
+  container.querySelectorAll('[data-save-role]').forEach(btn=>{
+    btn.onclick = ()=> saveRolePermissions(btn.dataset.saveRole, container);
+  });
+}
+
+async function saveRolePermissions(role, container){
+  const perms = {};
+  permFields().forEach(f => {
+    const box = container.querySelector(`input[data-role="${role}"][data-perm="${f.key}"]`);
+    perms[f.key] = box ? box.checked : false;
+  });
+  try{
+    state = await callServer('updateRolePermissions', sessionToken, role, perms);
+    renderAll();
+    showToast(t('toastRolePermissionsUpdated'));
+  }catch(err){
+    showToast(t('errorPrefix') + (err && err.message ? err.message : err), true);
+  }
+}
+
+/* ---------- user modal (create / edit + personal overrides) ---------- */
+function roleOptionsHtml(selected){
+  return roleOptions().map(r => `<option value="${r.value}" ${r.value===selected?'selected':''}>${r.label}</option>`).join('');
+}
+
+function overrideSelectHtml(key, label, overrideVal){
+  const val = overrideVal === true ? 'allow' : overrideVal === false ? 'deny' : 'inherit';
+  return `<div class="field">
+    <label>${label}</label>
+    <select id="ov_${key}" data-perm="${key}">
+      <option value="inherit" ${val==='inherit'?'selected':''}>${t('useRoleDefault')}</option>
+      <option value="allow" ${val==='allow'?'selected':''}>${t('alwaysAllow')}</option>
+      <option value="deny" ${val==='deny'?'selected':''}>${t('alwaysDeny')}</option>
+    </select>
+    <div class="perm-hint" id="hint_${key}"></div>
+  </div>`;
+}
+
+function openUserModal(u){
+  const overrides = u ? u.overrides : {};
+  const overridesHtml = permFields().map(f => overrideSelectHtml(f.key, f.label, overrides[f.key])).join('');
+  el('userModalContent').innerHTML = `
+    <div class="modal-title">${u ? t('modalEditUser') : t('modalNewUser')}</div>
+    <div class="modal-sub">${u ? t('modalEditUserSub') : t('modalNewUserSub')}</div>
+    ${!u ? `
+      <div class="field"><label>${t('labelUsernameField')}</label><input id="u_username" placeholder="${t('usernamePlaceholder')}"></div>
+      <div class="field"><label>${t('labelTempPassword')}</label><input id="u_password" type="text" placeholder="${t('tempPasswordPlaceholder')}"></div>
+    ` : ''}
+    <div class="field"><label>${t('labelDisplayName')}</label><input id="u_displayName" value="${u?escapeHtml(u.displayName):''}" placeholder="${t('displayNamePlaceholder')}"></div>
+    <div class="field"><label>${t('labelRole')}</label><select id="u_role">${roleOptionsHtml(u?u.role:'reservations')}</select></div>
+    ${u ? `<div class="field"><label>${t('labelStatus')}</label><select id="u_active">
+        <option value="true" ${u.active?'selected':''}>${t('statusActiveOpt')}</option>
+        <option value="false" ${!u.active?'selected':''}>${t('statusDisabledOpt')}</option>
+      </select></div>` : ''}
+    <div class="overrides-heading">${t('overridesHeading')}</div>
+    ${overridesHtml}
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="cancelUserModalBtn">${t('btnClose')}</button>
+      <button class="btn btn-primary" id="saveUserModalBtn">${u ? t('btnSaveChanges') : t('btnCreateUser')}</button>
+    </div>
+  `;
+  el('userModal').classList.remove('hidden');
+  el('cancelUserModalBtn').onclick = closeUserModal;
+  el('saveUserModalBtn').onclick = ()=> saveUser(u ? u.id : null);
+  el('u_role').addEventListener('change', updateOverrideHints);
+  updateOverrideHints();
+}
+function closeUserModal(){ el('userModal').classList.add('hidden'); }
+el('closeUserModal').onclick = closeUserModal;
+el('userModal').querySelector('.modal-overlay').onclick = closeUserModal;
+
+function updateOverrideHints(){
+  const role = el('u_role').value;
+  const rp = state.rolePermissions.find(r=>r.role===role) || {};
+  permFields().forEach(f=>{
+    const hintEl = el('hint_'+f.key);
+    if(hintEl) hintEl.textContent = roleDefaultHintText(rp[f.key] ? t('allowWord') : t('denyWord'));
+  });
+}
+function roleDefaultHintText(word){ return currentLang === 'ar' ? `الافتراضي للدور: ${word}` : `Role default: ${word}`; }
+
+function collectOverrides(){
+  const overrides = {};
+  permFields().forEach(f=>{
+    const sel = el('ov_'+f.key);
+    if(!sel) return;
+    if(sel.value === 'allow') overrides[f.key] = true;
+    else if(sel.value === 'deny') overrides[f.key] = false;
+  });
+  return overrides;
+}
+
+async function saveUser(id){
+  const g = i => document.getElementById(i) ? document.getElementById(i).value : undefined;
+  const btn = el('saveUserModalBtn');
+  btn.disabled = true; btn.textContent = t('saving');
+  try{
+    const overrides = collectOverrides();
+    if(id){
+      const payload = { displayName: g('u_displayName').trim(), role: g('u_role'), active: g('u_active') === 'true', overrides: overrides };
+      state = await callServer('updateUser', sessionToken, id, payload);
+      showToast(t('toastUserUpdated'));
+    } else {
+      const payload = {
+        username: g('u_username').trim(), password: g('u_password'),
+        displayName: g('u_displayName').trim(), role: g('u_role'), overrides: overrides
+      };
+      if(!payload.username || !payload.password || !payload.displayName){
+        showToast(t('toastFillAllFields'), true);
+        btn.disabled = false; btn.textContent = t('btnCreateUser');
+        return;
+      }
+      state = await callServer('addUser', sessionToken, payload);
+      showToast(t('toastUserCreated'));
+    }
+    closeUserModal();
+    renderAll();
+  }catch(err){
+    showToast(t('errorPrefix') + (err && err.message ? err.message : err), true);
+    btn.disabled = false; btn.textContent = id ? t('btnSaveChanges') : t('btnCreateUser');
+  }
+}
+
+async function resetUserPassword(id){
+  const pw = prompt(t('promptNewPassword'));
+  if(!pw) return;
+  try{
+    await callServer('resetPassword', sessionToken, id, pw);
+    showToast(t('toastPasswordReset'));
+  }catch(err){
+    showToast(t('errorPrefix') + (err && err.message ? err.message : err), true);
+  }
+}
+
+/* ---------- master render ---------- */
+function renderAll(){
+  renderUser();
+  renderKpis();
+  renderNotifBadges();
+  renderSearch();
+  renderRecentActivity();
+  renderContractsPage();
+  renderNotificationsPage();
+  renderHistoryPage();
+  
+}
+
+/* ---------- boot ---------- */
+async function bootApp(){
+  try{
+    state = await callServer('getBootstrap', sessionToken);
+    applyStaticTranslations();
+    renderAll();
+    stopLoaderMessages();
+    el('appLoader').classList.add('hidden');
+    el('loginScreen').classList.add('hidden');
+    el('app').classList.remove('hidden');
+  }catch(err){
+    stopLoaderMessages();
+    clearToken();
+    el('loginScreen').classList.add('hidden');el('appLoader').classList.add('hidden');el('app').classList.remove('hidden');showToast(err.message||'Failed to load',true);
+  }
+}
+
+/* ---------- init ---------- */
+async function init(){
+  currentLang = loadLang() || 'en';
+  applyStaticTranslations();
+  el('currentDate').textContent = new Date().toLocaleDateString(currentLang === 'ar' ? 'ar-EG-u-nu-latn' : 'en-GB', {weekday:'long', year:'numeric', month:'long', day:'numeric'});
+
+  el('langToggleBtn').addEventListener('click', toggleLanguage);
+  document.querySelectorAll('.nav-item[data-page]').forEach(b=> b.addEventListener('click', ()=>{
+  goToPage(b.dataset.page);
+  if(b.dataset.page === 'notifications') markAllNotificationsRead();
+}));
+  el('notificationButton').addEventListener('click', ()=>{ goToPage('notifications'); markAllNotificationsRead(); });
+  el('contractSearch').addEventListener('input', renderSearch);
+  el('clearSearch').addEventListener('click', ()=>{ el('contractSearch').value=''; renderSearch(); });
+  el('addContractBtn').addEventListener('click', ()=> openContractModal(null));
+  el('addUserBtn').addEventListener('click', ()=> openUserModal(null));
+  el('logoutBtn').addEventListener('click', doLogout);
+  el('loginBtn').addEventListener('click', attemptLogin);
+  el('loginPassword').addEventListener('keydown', e=>{ if(e.key==='Enter') attemptLogin(); });
+  el('loginUsername').addEventListener('keydown', e=>{ if(e.key==='Enter') el('loginPassword').focus(); });
+  document.querySelectorAll('.filter-tab[data-status]').forEach(tab=>{
+    tab.addEventListener('click', ()=>{
+      document.querySelectorAll('.filter-tab[data-status]').forEach(tb=>tb.classList.remove('active'));
+      tab.classList.add('active');
+      currentFilter = tab.dataset.status;
+      renderContractsPage();
+    });
+  });
+  document.querySelectorAll('[data-usertab]').forEach(tab=>{
+    tab.addEventListener('click', ()=> setUserTab(tab.dataset.usertab));
+  });
+
+  // password show/hide toggle
+  const pwToggle = el('togglePasswordBtn');
+  if(pwToggle){
+    pwToggle.addEventListener('click', ()=>{
+      const pwInput = el('loginPassword');
+      const isText = pwInput.type === 'text';
+      pwInput.type = isText ? 'password' : 'text';
+      pwToggle.classList.toggle('active', !isText);
+    });
+  }
+
+  // remember me — only remembers the username locally, never the password
+  const REMEMBER_KEY = 'retac_remembered_username';
+  try{
+    const remembered = localStorage.getItem(REMEMBER_KEY);
+    if(remembered){
+      el('loginUsername').value = remembered;
+      el('rememberMeChk').checked = true;
+    }
+  }catch(e){}
+
+  const googleLoginBtn = el('googleLoginBtn');
+  if(googleLoginBtn){
+    googleLoginBtn.addEventListener('click', ()=> showToast(currentLang === 'ar' ? 'تسجيل الدخول باستخدام Google غير مفعّل حاليًا.' : 'Google Sign-In is not enabled yet.', true));
+  }
+
+  // forgot password — points staff to an administrator, no self-service reset
+  const forgotLink = el('forgotPasswordLink');
+  if(forgotLink){
+    forgotLink.addEventListener('click', (e)=>{
+      e.preventDefault();
+      showToast(currentLang === 'ar'
+        ? 'يرجى التواصل مع المسؤول لإعادة تعيين كلمة المرور.'
+        : 'Please contact an administrator to reset your password.');
+    });
+  }
+
+  sessionToken='workspace';
+  await bootApp();
+}
+init();
+
+window.suiteSetModuleLanguage=function(value){
+ var next=value==='en'?'en':'ar';
+ // Preserve unsaved field values when existing module renderers refresh labels.
+ var fields=Array.from(document.querySelectorAll('input:not([type=file]),textarea,select')).filter(function(e){return e.id;}).map(function(e){return {id:e.id,value:e.value,checked:e.checked};});
+ if(currentLang!==next){currentLang=next;saveLangPref(next);applyLanguage();}
+ fields.forEach(function(f){var e=document.getElementById(f.id);if(!e)return;if(e.tagName!=='SELECT'||Array.from(e.options).some(function(o){return o.value===f.value;}))e.value=f.value;if(e.type==='checkbox'||e.type==='radio')e.checked=f.checked;});
+ var languageSetting=document.getElementById('languageSetting');if(languageSetting)languageSetting.value=next;
+};
+</script>
+</body>
+</html>
